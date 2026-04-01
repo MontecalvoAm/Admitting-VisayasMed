@@ -14,6 +14,8 @@ import {
   Download
 } from 'lucide-react';
 import Link from 'next/link';
+import PatientActions from '@/app/components/PatientActions';
+import DashboardClient from '@/app/components/DashboardClient';
 
 async function getStats() {
   // Total unique patients
@@ -151,23 +153,37 @@ export default async function DashboardPage() {
               {recentAdmissions.length === 0 ? (
                 <div className="p-12 text-center text-slate-400 font-medium">No recent activity</div>
               ) : (
-                recentAdmissions.map((record) => (
-                  <div key={record.Id} className="p-4 hover:bg-slate-50/50 transition-colors flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-xs shadow-inner uppercase">
-                        {record.LastName[0]}{record.GivenName[0]}
+                recentAdmissions.map((record) => {
+                  const isNew = !record.IsViewed && (new Date().getTime() - new Date(record.CreatedAt).getTime() < 24 * 60 * 60 * 1000);
+                  return (
+                    <div key={record.Id} className="p-4 hover:bg-slate-50/50 transition-colors flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-xs shadow-inner uppercase">
+                          {record.LastName[0]}{record.GivenName[0]}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <div className="text-sm font-bold text-slate-800">{record.LastName}, {record.GivenName}</div>
+                            {isNew && (
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-[9px] text-white font-black rounded-md shadow-sm border border-emerald-400/20 uppercase tracking-tighter animate-in fade-in zoom-in duration-500">
+                                <span className="w-1 h-1 rounded-full bg-white animate-ping" />
+                                New
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{record.ServiceCaseType || 'General'} • {record.Age} YRS</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-sm font-bold text-slate-800">{record.LastName}, {record.GivenName}</div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{record.ServiceCaseType || 'General'} • {record.Age} YRS</div>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <div className="text-xs font-bold text-slate-500">{new Date(record.CreatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                          <div className="text-[10px] font-semibold text-slate-400 uppercase">{new Date(record.CreatedAt).toLocaleDateString()}</div>
+                        </div>
+                        <DashboardClient id={record.Id} patient={record} />
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-slate-500">{new Date(record.CreatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                      <div className="text-[10px] font-semibold text-slate-400 uppercase">{new Date(record.CreatedAt).toLocaleDateString()}</div>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

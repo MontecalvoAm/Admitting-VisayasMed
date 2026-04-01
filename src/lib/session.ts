@@ -1,7 +1,10 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const secretKey = process.env.SESSION_SECRET || "default_secret_key_change_in_production_for_vismed";
+const secretKey = process.env.SESSION_SECRET;
+if (!secretKey) {
+  throw new Error("CRITICAL: SESSION_SECRET is not defined properly. System halting to prevent A02 Security Misconfiguration.");
+}
 const encodedKey = new TextEncoder().encode(secretKey);
 
 export type SessionPayload = {

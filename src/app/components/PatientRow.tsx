@@ -3,17 +3,22 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Clock, Calendar, Stethoscope, Activity, MapPin, User, ChevronUp } from 'lucide-react';
 import PatientActions from './PatientActions';
+import { useRouter } from 'next/navigation';
 
 interface PatientRowProps {
   patient: any;
+  index: number;
 }
 
-const PatientRow: React.FC<PatientRowProps> = ({ patient }) => {
+const PatientRow: React.FC<PatientRowProps> = ({ patient, index }) => {
+  const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   
   const hasHistory = (patient.AdmissionCount || 0) > 1;
+  const isNew = !patient.IsViewed && (new Date().getTime() - new Date(patient.CreatedAt).getTime() < 24 * 60 * 60 * 1000);
+  const isEven = index % 2 === 0;
 
   const toggleExpand = async () => {
     if (!hasHistory) return;
@@ -39,7 +44,7 @@ const PatientRow: React.FC<PatientRowProps> = ({ patient }) => {
   return (
     <>
       <tr 
-        className={`hover:bg-slate-50/50 transition-colors ${hasHistory ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-blue-50/30' : ''}`}
+        className={`hover:bg-slate-50/50 transition-colors ${hasHistory ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-vmed-blue-light/5' : !isEven ? 'bg-slate-50/50' : 'bg-white'}`}
         onClick={toggleExpand}
       >
         <td className="px-6 py-4">
@@ -52,6 +57,12 @@ const PatientRow: React.FC<PatientRowProps> = ({ patient }) => {
             <div>
               <div className="flex items-center gap-2">
                 <div className="font-bold text-slate-800">{patient.LastName}, {patient.GivenName}</div>
+                {isNew && (
+                  <span className="flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-[9px] text-white font-black rounded-md shadow-sm border border-emerald-400/20 uppercase tracking-tighter animate-in fade-in zoom-in duration-500">
+                    <span className="w-1 h-1 rounded-full bg-white animate-ping" />
+                    New
+                  </span>
+                )}
                 {hasHistory && !isExpanded && (
                   <span className="px-1.5 py-0.5 bg-blue-50 text-[9px] text-vmed-blue-light font-bold rounded border border-blue-100 uppercase">
                     {patient.AdmissionCount} Admissions
@@ -83,7 +94,10 @@ const PatientRow: React.FC<PatientRowProps> = ({ patient }) => {
           </div>
         </td>
         <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
-          <PatientActions patient={patient} />
+          <PatientActions 
+            patient={patient} 
+            onInteraction={() => router.refresh()}
+          />
         </td>
       </tr>
       

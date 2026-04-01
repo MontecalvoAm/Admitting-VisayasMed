@@ -1,0 +1,1 @@
+ALTER TABLE M_Admissions ADD COLUMN IsViewed TINYINT(1) DEFAULT 0 AFTER IsDeleted;

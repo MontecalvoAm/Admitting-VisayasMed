@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email already exists.' }, { status: 400 });
     }
 
-    const hashedPassword = await bcrypt.hash(data.Password, 10);
+    const hashedPassword = await bcrypt.hash(data.Password, 12);
 
     const query = `
       INSERT INTO M_Users (FirstName, LastName, Email, Password, RoleID, CreatedAt, IsDeleted)

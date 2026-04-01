@@ -2,7 +2,7 @@ import pool from './db';
 import { getSession } from './session';
 import { headers } from 'next/headers';
 
-export type AuditAction = 'LOGIN' | 'LOGOUT' | 'CREATE' | 'UPDATE' | 'DELETE' | 'PRINT' | 'EXPORT' | 'VIEW' | 'RESTORE' | 'PERMANENT_DELETE';
+export type AuditAction = 'LOGIN' | 'FAILED_LOGIN' | 'LOGOUT' | 'CREATE' | 'UPDATE' | 'DELETE' | 'PRINT' | 'EXPORT' | 'VIEW' | 'RESTORE' | 'PERMANENT_DELETE';
 export type AuditResource = 'Patient' | 'Admission' | 'User' | 'Role' | 'Form' | 'Settings' | 'System' | 'Archive';
 
 interface AuditLogParams {

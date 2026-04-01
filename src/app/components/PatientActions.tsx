@@ -13,9 +13,10 @@ interface PatientActionsProps {
   patient: any;
   isAdmission?: boolean;
   onSuccess?: () => void;
+  onInteraction?: () => void;
 }
 
-const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = false, onSuccess }) => {
+const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = false, onSuccess, onInteraction }) => {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -130,6 +131,21 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
   };
  circular_dependency_warning: false
 
+  const markAsViewed = async () => {
+    try {
+      const admissionId = isAdmission ? patient.Id : patient.CurrentAdmissionID;
+      if (!admissionId) return;
+
+      await fetch(`/api/admissions/${admissionId}/view`, {
+        method: 'PUT',
+      });
+      
+      if (onInteraction) onInteraction();
+    } catch (err) {
+      console.error('Failed to mark as viewed:', err);
+    }
+  };
+
   const handleDelete = async () => {
     if (!permissions?.CanDelete) return;
     
@@ -209,7 +225,10 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
   return (
     <div className="flex items-center justify-center gap-2">
       <button 
-        onClick={() => setIsPrintPreviewOpen(true)}
+        onClick={() => {
+          setIsPrintPreviewOpen(true);
+          markAsViewed();
+        }}
         className="p-2 text-slate-400 hover:text-vmed-blue-dark hover:bg-blue-50 rounded-lg transition-all"
         title="Print Preview"
       >
@@ -217,7 +236,10 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
       </button>
 
       <button 
-        onClick={() => setIsViewOpen(true)}
+        onClick={() => {
+          setIsViewOpen(true);
+          markAsViewed();
+        }}
         className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
         title="View Details"
       >
@@ -229,6 +251,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
           onClick={() => {
             setEditedPatient({ ...patient });
             setIsEditOpen(true);
+            markAsViewed();
           }}
           className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
           title="Edit Record"
