@@ -1,68 +1,92 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
-import { ResultSetHeader } from 'mysql2';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { recordAuditLog } from '@/lib/auditLogger';
 
 export async function POST(req: NextRequest) {
+  const connection = await pool.getConnection();
   try {
     const data = await req.json();
 
-    // Basic validation
     if (!data.LastName || !data.GivenName) {
       return NextResponse.json({ error: 'LastName and GivenName are required.' }, { status: 400 });
     }
 
-    const query = `
-      INSERT INTO M_Patients (
-        LastName, GivenName, MiddleName, Suffix, Age, Birthday, BirthPlace, Sex, 
-        ContactNumber, CityAddress, ProvincialAddress, CivilStatus, Religion, Citizenship, Occupation,
-        FatherFamilyName, FatherGivenName, FatherMiddleName, FatherContact,
-        MotherFamilyName, MotherGivenName, MotherMiddleName, MotherContact,
-        SpouseFamilyName, SpouseGivenName, SpouseMiddleName, SpouseContact,
-        EmergencyContactName, EmergencyRelation, EmergencyContactNumber,
-        ResponsibleName, ResponsibleContact, ResponsibleAddress, ResponsibleRelation,
-        AttendingPhysician, PreviouslyAdmitted, PreviousAdmissionDate, PhilHealthStatus, 
+    await connection.beginTransaction();
+
+    // 1. Find or Create Patient
+    const [existing] = await connection.query<RowDataPacket[]>(
+      `SELECT PatientID FROM M_Patients 
+       WHERE TRIM(LOWER(LastName)) = TRIM(LOWER(?)) 
+         AND TRIM(LOWER(GivenName)) = TRIM(LOWER(?)) 
+         AND (Birthday = ? OR (Birthday IS NULL AND ? IS NULL))
+         AND IsDeleted = false 
+       LIMIT 1`,
+      [data.LastName, data.GivenName, data.Birthday || null, data.Birthday || null]
+    );
+
+    let patientId: number;
+
+    if (existing.length > 0) {
+      patientId = existing[0].PatientID;
+    } else {
+      const [patientResult] = await connection.execute<ResultSetHeader>(
+        `INSERT INTO M_Patients (
+          LastName, GivenName, MiddleName, Suffix, Birthday, BirthPlace, Sex, 
+          ContactNumber, CityAddress, ProvincialAddress, CivilStatus, Religion, Citizenship, Occupation,
+          FatherFamilyName, FatherGivenName, FatherMiddleName, FatherContact,
+          MotherFamilyName, MotherGivenName, MotherMiddleName, MotherContact,
+          SpouseFamilyName, SpouseGivenName, SpouseMiddleName, SpouseContact,
+          EmergencyContactName, EmergencyRelation, EmergencyContactNumber,
+          ResponsibleName, ResponsibleContact, ResponsibleAddress, ResponsibleRelation,
+          CreatedBy
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          data.LastName || null, data.GivenName || null, data.MiddleName || null, data.Suffix || null, data.Birthday || null, data.BirthPlace || null, data.Sex || null, 
+          data.ContactNumber || null, data.CityAddress || null, data.ProvincialAddress || null, data.CivilStatus || null, data.Religion || null, data.Citizenship || null, data.Occupation || null,
+          data.FatherFamilyName || null, data.FatherGivenName || null, data.FatherMiddleName || null, data.FatherContact || null,
+          data.MotherFamilyName || null, data.MotherGivenName || null, data.MotherMiddleName || null, data.MotherContact || null,
+          data.SpouseFamilyName || null, data.SpouseGivenName || null, data.SpouseMiddleName || null, data.SpouseContact || null,
+          data.EmergencyContactName || null, data.EmergencyRelation || null, data.EmergencyContactNumber || null,
+          data.ResponsibleName || null, data.ResponsibleContact || null, data.ResponsibleAddress || null, data.ResponsibleRelation || null,
+          'System'
+        ]
+      );
+      patientId = patientResult.insertId;
+    }
+
+    // 2. Create Admission Record
+    const [admissionResult] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO M_Admissions (
+        PatientID, Age, AttendingPhysician, PreviouslyAdmitted, PreviousAdmissionDate, PhilHealthStatus, 
         HmoCompany, VmcBenefit, ServiceCaseType,
-        CreatedAt, IsDeleted
-      ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, 
-        ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?,
-        ?, ?, ?, ?,
-        ?, ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?, ?,
-        ?, ?, ?, ?, 
-        ?, ?, ?,
-        CURRENT_TIMESTAMP, false
-      )
-    `;
+        PrintedNameSignature, RelationToPatientSignature, NameSignature2,
+        CreatedBy
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        patientId, data.Age || null, data.AttendingPhysician || null, data.PreviouslyAdmitted || false, 
+        data.PreviousAdmissionDate || null, data.PhilHealthStatus || null, data.HmoCompany || false, 
+        data.VmcBenefit || null, data.ServiceCaseType || null,
+        data.PrintedNameSignature || null, data.RelationToPatientSignature || null, data.NameSignature2 || null,
+        'System'
+      ]
+    );
 
-    const values = [
-      data.LastName || null, data.GivenName || null, data.MiddleName || null, data.Suffix || null, data.Age || null, data.Birthday || null, data.BirthPlace || null, data.Sex || null, 
-      data.ContactNumber || null, data.CityAddress || null, data.ProvincialAddress || null, data.CivilStatus || null, data.Religion || null, data.Citizenship || null, data.Occupation || null,
-      data.FatherFamilyName || null, data.FatherGivenName || null, data.FatherMiddleName || null, data.FatherContact || null,
-      data.MotherFamilyName || null, data.MotherGivenName || null, data.MotherMiddleName || null, data.MotherContact || null,
-      data.SpouseFamilyName || null, data.SpouseGivenName || null, data.SpouseMiddleName || null, data.SpouseContact || null,
-      data.EmergencyContactName || null, data.EmergencyRelation || null, data.EmergencyContactNumber || null,
-      data.ResponsibleName || null, data.ResponsibleContact || null, data.ResponsibleAddress || null, data.ResponsibleRelation || null,
-      data.AttendingPhysician || null, data.PreviouslyAdmitted || false, data.PreviousAdmissionDate || null, data.PhilHealthStatus || null, 
-      data.HmoCompany || false, data.VmcBenefit || null, data.ServiceCaseType || null
-    ];
+    await connection.commit();
 
-    const [result] = await pool.execute<ResultSetHeader>(query, values);
-
-    // Record Audit Log
     await recordAuditLog({
       action: 'CREATE',
       resource: 'Patient',
-      resourceId: result.insertId,
-      details: `New patient record created for ${data.LastName}, ${data.GivenName}.`
+      resourceId: patientId,
+      details: `New admission recorded for patient ${data.LastName}, ${data.GivenName}.`
     });
 
-    return NextResponse.json({ success: true, id: result.insertId }, { status: 201 });
+    return NextResponse.json({ success: true, id: patientId, admissionId: admissionResult.insertId }, { status: 201 });
   } catch (error) {
+    await connection.rollback();
     console.error('Error creating patient admission:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  } finally {
+    connection.release();
   }
 }

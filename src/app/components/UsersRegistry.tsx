@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Settings, Mail, Shield, CheckCircle, XCircle, Key, Edit, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { UserPlus, Settings, Mail, Shield, CheckCircle, XCircle, Key, Edit, Trash2, Loader2, AlertTriangle, Search, Filter, X, RefreshCcw, Eye } from 'lucide-react';
 import Modal from './Modal';
 import UserForm from './UserForm';
 import PaginationWrapper from './PaginationWrapper';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PermissionModal from './PermissionModal';
+import AuditTrail from './AuditTrail';
+import { useStatusModal } from './StatusModalContext';
 
 interface UsersRegistryProps {
   users: any[];
@@ -24,20 +26,33 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
   itemsPerPage 
 }) => {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [roleFilter, setRoleFilter] = useState(searchParams.get('role') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [roles, setRoles] = useState<any[]>([]);
+  
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [formData, setFormData] = useState<any>({});
+  const { showSuccess, showError, showConfirm, setLoading, hideModal } = useStatusModal();
   
   // RBAC State
   const [myPermissions, setMyPermissions] = useState<any>(null);
   const [isPermsLoading, setIsPermsLoading] = useState(true);
 
+  const hasActiveFilters = searchTerm || roleFilter || statusFilter;
+
   useEffect(() => {
     fetchMyPermissions();
+    fetchRoles();
   }, []);
 
   const fetchMyPermissions = async () => {
@@ -53,6 +68,66 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
     } finally {
       setIsPermsLoading(false);
     }
+  };
+
+  const fetchRoles = async () => {
+    try {
+      const res = await fetch('/api/rbac/roles?limit=100');
+      if (res.ok) {
+        const data = await res.json();
+        setRoles(data.roles || []);
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+    }
+  };
+
+  // Synchronize state with URL
+  useEffect(() => {
+    setSearchTerm(searchParams.get('search') || '');
+    setRoleFilter(searchParams.get('role') || '');
+    setStatusFilter(searchParams.get('status') || '');
+  }, [searchParams]);
+
+  // Debounce search
+  useEffect(() => {
+    const currentSearch = searchParams.get('search') || '';
+    if (searchTerm === currentSearch) return;
+
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (searchTerm) params.set('search', searchTerm);
+      else params.delete('search');
+      params.set('page', '1');
+      router.push(`?${params.toString()}`);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm, router, searchParams]);
+
+  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setRoleFilter(val);
+    const params = new URLSearchParams(searchParams.toString());
+    if (val) params.set('role', val);
+    else params.delete('role');
+    params.set('page', '1');
+    router.push(`?${params.toString()}`);
+  };
+
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setStatusFilter(val);
+    const params = new URLSearchParams(searchParams.toString());
+    if (val) params.set('status', val);
+    else params.delete('status');
+    params.set('page', '1');
+    router.push(`?${params.toString()}`);
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    router.refresh();
+    setTimeout(() => setIsRefreshing(false), 800);
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -72,11 +147,13 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
         setIsAddModalOpen(false);
         setFormData({});
         router.refresh();
+        showSuccess('User Created', `User account for ${formData.FirstName} ${formData.LastName} has been successfully created.`);
       } else {
         const err = await res.json();
-        alert(err.error || 'Failed to add user');
+        showError('Registration Failed', err.error || 'Failed to add user account.');
       }
     } catch (error) {
+      showError('System Error', 'An unexpected error occurred while adding the user.');
       console.error('Error adding user:', error);
     } finally {
       setIsSaving(false);
@@ -95,11 +172,13 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
         setIsEditModalOpen(false);
         setFormData({});
         router.refresh();
+        showSuccess('User Updated', `Account information for ${formData.FirstName} ${formData.LastName} has been updated.`);
       } else {
         const err = await res.json();
-        alert(err.error || 'Failed to update user');
+        showError('Update Failed', err.error || 'Failed to update user account.');
       }
     } catch (error) {
+      showError('System Error', 'An unexpected error occurred while updating the user.');
       console.error('Error updating user:', error);
     } finally {
       setIsSaving(false);
@@ -107,22 +186,35 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
   };
 
   const handleDeleteUser = async () => {
-    setIsSaving(true);
-    try {
-      const res = await fetch(`/api/users/${selectedUser.UserID}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setIsDeleteModalOpen(false);
-        router.refresh();
-      } else {
-        alert('Failed to delete user');
-      }
-    } catch (error) {
-      console.error('Error deleting user:', error);
-    } finally {
-      setIsSaving(false);
-    }
+    if (!selectedUser) return;
+
+    showConfirm(
+      'Confirm Deletion',
+      `Are you sure you want to delete ${selectedUser.FirstName} ${selectedUser.LastName}? This will disable their access to the system immediately.`,
+      async () => {
+        setLoading(true);
+        try {
+          const res = await fetch(`/api/users/${selectedUser.UserID}`, {
+            method: 'DELETE',
+          });
+          if (res.ok) {
+            router.refresh();
+            hideModal();
+            setTimeout(() => {
+              showSuccess('User Deleted', 'The user account has been successfully removed from the system registry.');
+            }, 300);
+          } else {
+            showError('Deletion Failed', 'Failed to delete user account.');
+          }
+        } catch (error) {
+          console.error('Error deleting user:', error);
+          showError('System Error', 'An error occurred while deleting the user account.');
+        } finally {
+          setLoading(false);
+        }
+      },
+      'Yes, Delete User'
+    );
   };
 
   const openPermissionModal = (user: any) => {
@@ -131,24 +223,97 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">System Users</h2>
           <p className="text-sm text-slate-500 font-medium">Manage access controls and user permissions.</p>
         </div>
         
-        {myPermissions?.CanAdd && (
+        <div className="flex items-center gap-2">
           <button 
-            onClick={() => {
-              setFormData({});
-              setIsAddModalOpen(true);
-            }}
-            className="flex items-center gap-2 px-4 h-10 bg-vmed-blue-dark text-white rounded-xl text-sm font-bold hover:bg-vmed-blue-light transition-all shadow-lg shadow-blue-200"
+            onClick={handleRefresh}
+            className={`p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-vmed-blue hover:border-vmed-blue/30 hover:shadow-sm transition-all ${isRefreshing ? 'bg-slate-50' : ''}`}
+            title="Refresh Users"
           >
-            <UserPlus className="w-4 h-4" /> Add User
+            <RefreshCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
-        )}
+
+          {myPermissions?.CanAdd && (
+            <button 
+              onClick={() => {
+                setFormData({});
+                setIsAddModalOpen(true);
+              }}
+              className="flex items-center gap-2 px-4 h-10 bg-vmed-blue-dark text-white rounded-xl text-sm font-bold hover:bg-vmed-blue-light transition-all shadow-lg shadow-blue-200"
+            >
+              <UserPlus className="w-4 h-4" /> Add User
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="glass-panel p-4 rounded-2xl flex flex-wrap items-center gap-4">
+        <div className="relative flex-1 min-w-[250px]">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input 
+            type="text" 
+            placeholder="Search users by name or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-11 pr-11 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+          />
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[160px]">
+            <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <select
+              value={roleFilter}
+              onChange={handleRoleChange}
+              className="w-full pl-11 pr-10 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-600 font-medium appearance-none"
+            >
+              <option value="">All Roles</option>
+              {roles.map(role => (
+                <option key={role.RoleID} value={role.RoleID}>{role.RoleName}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="relative min-w-[160px]">
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <select
+              value={statusFilter}
+              onChange={handleStatusChange}
+              className="w-full pl-11 pr-10 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-600 font-medium appearance-none"
+            >
+              <option value="">Status: All</option>
+              <option value="Active">Active Only</option>
+              <option value="Inactive">Inactive Only</option>
+            </select>
+          </div>
+
+          {hasActiveFilters && (
+            <button 
+              onClick={() => {
+                setSearchTerm('');
+                setRoleFilter('');
+                setStatusFilter('');
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete('search');
+                params.delete('role');
+                params.delete('status');
+                params.set('page', '1');
+                router.push(`?${params.toString()}`);
+              }}
+              className="p-2.5 bg-slate-50 text-slate-400 hover:text-red-500 border border-slate-200 rounded-xl transition-all hover:bg-red-50 group shadow-sm active:scale-95 animate-in fade-in zoom-in duration-200"
+              title="Clear All Filters"
+            >
+              <X className="w-4 h-4 group-hover:scale-110 transition-transform" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="glass-panel overflow-hidden rounded-2xl">
@@ -204,6 +369,17 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center gap-1">
+                        <button 
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setIsViewModalOpen(true);
+                          }}
+                          className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+
                         {myPermissions?.CanEdit && (
                           <button 
                             onClick={() => openPermissionModal(user)}
@@ -230,7 +406,7 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
                           <button 
                             onClick={() => {
                               setSelectedUser(user);
-                              setIsDeleteModalOpen(true);
+                              handleDeleteUser();
                             }}
                             className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                             title="Delete User"
@@ -258,6 +434,26 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
         />
       </div>
 
+      {/* View User Modal */}
+      <Modal 
+        isOpen={isViewModalOpen} 
+        onClose={() => setIsViewModalOpen(false)} 
+        title="User Details"
+      >
+        <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+          <UserForm formData={selectedUser || {}} isReadOnly={true} />
+          <AuditTrail resource="User" id={selectedUser?.UserID} />
+        </div>
+        <div className="mt-8 flex justify-end">
+          <button 
+            onClick={() => setIsViewModalOpen(false)} 
+            className="px-6 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </Modal>
+
       {/* Add User Modal */}
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title="Add New User">
         <UserForm formData={formData} onChange={handleFormChange} />
@@ -278,26 +474,6 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
           <button onClick={handleEditUser} disabled={isSaving} className="flex items-center gap-2 px-6 py-2 bg-vmed-blue-dark text-white rounded-xl font-bold hover:bg-vmed-blue-light transition-all shadow-lg shadow-blue-200 disabled:opacity-50">
             {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
             Save Changes
-          </button>
-        </div>
-      </Modal>
-
-      {/* Delete User Modal */}
-      <Modal isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} title="Confirm Deletion" width="max-w-md">
-        <div className="text-center py-4">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
-            <AlertTriangle className="w-8 h-8" />
-          </div>
-          <h4 className="text-lg font-bold text-slate-800 mb-2">Delete User?</h4>
-          <p className="text-slate-500 text-sm">
-            Are you sure you want to delete <span className="font-bold text-slate-700">{selectedUser?.FirstName} {selectedUser?.LastName}</span>? This will disable their access to the system.
-          </p>
-        </div>
-        <div className="mt-6 flex justify-center gap-3">
-          <button onClick={() => setIsDeleteModalOpen(false)} className="px-6 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors">No, Cancel</button>
-          <button onClick={handleDeleteUser} disabled={isSaving} className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200 disabled:opacity-50">
-            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Yes, Delete
           </button>
         </div>
       </Modal>

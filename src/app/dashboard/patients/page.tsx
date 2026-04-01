@@ -9,72 +9,83 @@ import PaginationWrapper from '@/app/components/PaginationWrapper';
 import PatientRow from '@/app/components/PatientRow';
 import PatientsRegistryHeader from '@/app/components/PatientsRegistryHeader';
 
-async function getAdmissions(page: number, limit: number, search?: string, date?: string) {
+async function getAdmissions(page: number, limit: number, search?: string, date?: string, caseType?: string) {
   const offset = (page - 1) * limit;
   const params: any[] = [];
 
-  // Resilient grouping: Group by name only to handle corrupted/shifted birthdays
-  const idSubquery = `
-    SELECT MAX(Id) FROM M_Patients 
-    WHERE IsDeleted = false
-    GROUP BY TRIM(LastName), TRIM(GivenName), IFNULL(TRIM(MiddleName), ''), IFNULL(TRIM(Suffix), '')
-  `;
-
+  // Optimized query: Join M_Patients with their LATEST admission
   let query = `
-    SELECT p.*, 
-      (SELECT COUNT(*) FROM M_Patients p2 
-       WHERE TRIM(p2.LastName) = TRIM(p.LastName) 
-         AND TRIM(p2.GivenName) = TRIM(p.GivenName) 
-         AND (TRIM(p2.MiddleName) = TRIM(p.MiddleName) OR (p2.MiddleName IS NULL AND p.MiddleName IS NULL))
-         AND (TRIM(p2.Suffix) = TRIM(p.Suffix) OR (p2.Suffix IS NULL AND p.Suffix IS NULL))
-         AND p2.IsDeleted = false
-      ) as AdmissionCount
+    SELECT p.*, a.*, p.PatientID as Id, a.AdmissionID as CurrentAdmissionID,
+      (SELECT COUNT(*) FROM M_Admissions a2 WHERE a2.PatientID = p.PatientID AND a2.IsDeleted = false) as AdmissionCount
     FROM M_Patients p
-    WHERE p.Id IN (${idSubquery})
+    JOIN M_Admissions a ON p.PatientID = a.PatientID
+    -- Subquery to find only the LATEST admission per patient
+    JOIN (
+      SELECT PatientID, MAX(AdmissionID) as LatestAdmissionID
+      FROM M_Admissions
+      WHERE IsDeleted = false
+      GROUP BY PatientID
+    ) Latest ON a.AdmissionID = Latest.LatestAdmissionID
+    WHERE p.IsDeleted = false
   `;
 
-  if (search || date) {
-    const searchConditions = [];
-    if (search) {
-      searchConditions.push('(p.LastName LIKE ? OR p.GivenName LIKE ? OR p.AttendingPhysician LIKE ?)');
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    }
-    if (date) {
-      // Find patients who have AT LEAST ONE admission on this date
-      searchConditions.push(`EXISTS (
-        SELECT 1 FROM M_Patients p3 
-        WHERE TRIM(p3.LastName) = TRIM(p.LastName) 
-          AND TRIM(p3.GivenName) = TRIM(p.GivenName) 
-          AND (TRIM(p3.MiddleName) = TRIM(p.MiddleName) OR (p3.MiddleName IS NULL AND p.MiddleName IS NULL))
-          AND (TRIM(p3.Suffix) = TRIM(p.Suffix) OR (p3.Suffix IS NULL AND p.Suffix IS NULL))
-          AND DATE(p3.CreatedAt) = ?
-          AND p3.IsDeleted = false
-      )`);
-      params.push(date);
-    }
-    query += ` AND ${searchConditions.join(' AND ')}`;
+  const conditions = [];
+  if (search) {
+    conditions.push('(p.LastName LIKE ? OR p.GivenName LIKE ? OR a.AttendingPhysician LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+  if (date) {
+    // Optimized date filtering: match any admission on this date for the patient
+    conditions.push(`EXISTS (
+      SELECT 1 FROM M_Admissions a3 
+      WHERE a3.PatientID = p.PatientID 
+        AND DATE(a3.AdmittedAt) = ?
+        AND a3.IsDeleted = false
+    )`);
+    params.push(date);
+  }
+  if (caseType) {
+    conditions.push('a.ServiceCaseType = ?');
+    params.push(caseType);
   }
 
-  query += ` ORDER BY p.CreatedAt DESC LIMIT ? OFFSET ?`;
+  if (conditions.length > 0) {
+    query += ` AND ${conditions.join(' AND ')}`;
+  }
+
+  query += ` ORDER BY a.AdmittedAt DESC LIMIT ? OFFSET ?`;
   
   const [rows] = await pool.query<RowDataPacket[]>(query, [...params, limit, offset]);
   
-  // Total count query (matching the resilient grouping)
+  // Total count query (much simpler now)
   let countQuery = `
-    SELECT COUNT(DISTINCT TRIM(LastName), TRIM(GivenName), IFNULL(TRIM(MiddleName), ''), IFNULL(TRIM(Suffix), '')) as count 
-    FROM M_Patients 
+    SELECT COUNT(*) as count 
+    FROM M_Patients p
     WHERE IsDeleted = false
   `;
   const countParams: any[] = [];
-  if (search || date) {
-    if (search) {
-      countQuery += ' AND (LastName LIKE ? OR GivenName LIKE ? OR AttendingPhysician LIKE ?)';
-      countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    }
+  const countConditions = [];
+  if (search) {
+    countConditions.push('(LastName LIKE ? OR GivenName LIKE ?)');
+    countParams.push(`%${search}%`, `%${search}%`);
+  }
+  // Note: Filtering count by admission date/casetype is trickier if we only want unique patients
+  // but for the registry, we want unique patients that match the criteria.
+  if (date || caseType) {
+    countQuery += ` AND EXISTS (SELECT 1 FROM M_Admissions a_count WHERE a_count.PatientID = p.PatientID AND a_count.IsDeleted = false`;
     if (date) {
-       countQuery += ' AND DATE(CreatedAt) = ?';
-       countParams.push(date);
+      countQuery += ` AND DATE(a_count.AdmittedAt) = ?`;
+      countParams.push(date);
     }
+    if (caseType) {
+      countQuery += ` AND a_count.ServiceCaseType = ?`;
+      countParams.push(caseType);
+    }
+    countQuery += `)`;
+  }
+
+  if (countConditions.length > 0) {
+    countQuery += ` AND ${countConditions.join(' AND ')}`;
   }
 
   const [countRows] = await pool.query<RowDataPacket[]>(countQuery, countParams);
@@ -92,7 +103,7 @@ export const dynamic = 'force-dynamic';
 export default async function PatientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; limit?: string; search?: string; date?: string }>;
+  searchParams: Promise<{ page?: string; limit?: string; search?: string; date?: string; caseType?: string }>;
 }) {
   const session = await getSession();
   if (!session) {
@@ -101,11 +112,12 @@ export default async function PatientsPage({
 
   const awaitedParams = await searchParams;
   const currentPage = Number(awaitedParams.page) || 1;
-  const itemsPerPage = Number(awaitedParams.limit) || 10;
+  const itemsPerPage = Number(awaitedParams.limit) || 5;
   const search = awaitedParams.search || '';
   const date = awaitedParams.date || '';
+  const caseType = awaitedParams.caseType || '';
 
-  const { admissions, totalItems } = await getAdmissions(currentPage, itemsPerPage, search, date);
+  const { admissions, totalItems } = await getAdmissions(currentPage, itemsPerPage, search, date, caseType);
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   return (

@@ -25,11 +25,19 @@ export default function PaginationWrapper({
     router.push(`?${params.toString()}`);
   };
 
+  const handleLimitChange = (limit: number) => {
+    const params = new URLSearchParams(window.location.search);
+    params.set('limit', limit.toString());
+    params.set('page', '1'); // Reset to first page when limit changes
+    router.push(`?${params.toString()}`);
+  };
+
   return (
     <Pagination 
       currentPage={currentPage} 
       totalPages={totalPages} 
       onPageChange={handlePageChange} 
+      onLimitChange={handleLimitChange}
       totalItems={totalItems} 
       itemsPerPage={itemsPerPage} 
     />

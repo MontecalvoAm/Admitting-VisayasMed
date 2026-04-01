@@ -11,7 +11,8 @@ import {
   ClipboardList,
   Shield,
   Loader2,
-  Database
+  Database,
+  Archive
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -51,6 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({ userName, email, userId, roleId }) =>
     { name: 'Forms', href: '/dashboard/forms', icon: ClipboardList, moduleName: 'Forms' },
     { name: 'Users', href: '/dashboard/users', icon: Settings, moduleName: 'Users' },
     { name: 'Logs', href: '/dashboard/logs', icon: Database, moduleName: 'Logs' },
+    { name: 'Archive', href: '/dashboard/archive', icon: Archive, moduleName: 'Archive' },
   ];
 
   // Filter items based on CanView permission

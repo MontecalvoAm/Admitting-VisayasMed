@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Plus, Calendar, Loader2, X, ShieldAlert } from 'lucide-react';
+import { Search, Download, Plus, Calendar, Loader2, X, ShieldAlert, RefreshCcw, Filter } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Modal from './Modal';
 import PatientForm from './PatientForm';
@@ -12,13 +12,17 @@ const PatientsRegistryHeader = () => {
   
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [dateFilter, setDateFilter] = useState(searchParams.get('date') || '');
+  const [caseTypeFilter, setCaseTypeFilter] = useState(searchParams.get('caseType') || '');
   const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [newPatient, setNewPatient] = useState<any>({});
   
   // RBAC State
   const [permissions, setPermissions] = useState<any>(null);
   const [isLoadingPerms, setIsLoadingPerms] = useState(true);
+
+  const hasActiveFilters = searchTerm || dateFilter || caseTypeFilter;
 
   useEffect(() => {
     fetchPermissions();
@@ -43,6 +47,7 @@ const PatientsRegistryHeader = () => {
   useEffect(() => {
     setSearchTerm(searchParams.get('search') || '');
     setDateFilter(searchParams.get('date') || '');
+    setCaseTypeFilter(searchParams.get('caseType') || '');
   }, [searchParams]);
 
   // Debounce search
@@ -68,6 +73,22 @@ const PatientsRegistryHeader = () => {
     else params.delete('date');
     params.set('page', '1');
     router.push(`?${params.toString()}`);
+  };
+
+  const handleCaseTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setCaseTypeFilter(val);
+    const params = new URLSearchParams(searchParams.toString());
+    if (val) params.set('caseType', val);
+    else params.delete('caseType');
+    params.set('page', '1');
+    router.push(`?${params.toString()}`);
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    router.refresh();
+    setTimeout(() => setIsRefreshing(false), 800);
   };
 
   const handlePatientChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -109,6 +130,16 @@ const PatientsRegistryHeader = () => {
         </div>
         
         <div className="flex items-center gap-3">
+          <button 
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 px-4 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
+            title="Refresh Data"
+          >
+            <RefreshCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-vmed-blue-light' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+
           <button className="flex items-center gap-2 px-4 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm">
             <Download className="w-4 h-4" /> Export
           </button>
@@ -134,7 +165,7 @@ const PatientsRegistryHeader = () => {
       </div>
 
       <div className="glass-panel p-4 rounded-2xl flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[300px]">
+        <div className="relative flex-1 min-w-[250px]">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input 
             type="text" 
@@ -153,41 +184,47 @@ const PatientsRegistryHeader = () => {
           )}
         </div>
         
-        <div className="flex items-center gap-2 min-w-[200px]">
-          <div className="relative flex-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[160px]">
             <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <input 
               type="date" 
               value={dateFilter}
               onChange={handleDateChange}
-              className="w-full pl-11 pr-11 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-600 font-medium"
+              className="w-full pl-11 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-600 font-medium"
             />
-            {dateFilter && (
-              <button 
-                onClick={() => {
-                  setDateFilter('');
-                  const params = new URLSearchParams(searchParams.toString());
-                  params.delete('date');
-                  params.set('page', '1');
-                  router.push(`?${params.toString()}`);
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-slate-500 rounded-lg transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
           </div>
-          <button 
-            onClick={() => {
-              setSearchTerm('');
-              setDateFilter('');
-              router.push('?');
-            }}
-            className="p-2.5 bg-slate-50 text-slate-400 hover:text-red-500 border border-slate-200 rounded-xl transition-all hover:bg-red-50 group shadow-sm active:scale-95"
-            title="Clear All Filters"
-          >
-            <X className="w-4 h-4 group-hover:scale-110 transition-transform" />
-          </button>
+
+          <div className="relative min-w-[160px]">
+            <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <select
+              value={caseTypeFilter}
+              onChange={handleCaseTypeChange}
+              className="w-full pl-11 pr-10 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-600 font-medium appearance-none"
+            >
+              <option value="">All Case Types</option>
+              <option value="Private">Private</option>
+              <option value="Charity">Charity</option>
+              <option value="General">General</option>
+              <option value="Package">Package</option>
+              <option value="Project Case">Project Case</option>
+            </select>
+          </div>
+
+          {hasActiveFilters && (
+            <button 
+              onClick={() => {
+                setSearchTerm('');
+                setDateFilter('');
+                setCaseTypeFilter('');
+                router.push('?');
+              }}
+              className="p-2.5 bg-slate-50 text-slate-400 hover:text-red-500 border border-slate-200 rounded-xl transition-all hover:bg-red-50 group shadow-sm active:scale-95 animate-in fade-in zoom-in duration-200"
+              title="Clear All Filters"
+            >
+              <X className="w-4 h-4 group-hover:scale-110 transition-transform" />
+            </button>
+          )}
         </div>
       </div>
 

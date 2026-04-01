@@ -8,6 +8,8 @@ import {
   ClipboardList, Info, Printer, ShieldAlert
 } from 'lucide-react';
 import PrintableForm from '@/app/components/PrintableForm';
+import { useStatusModal } from '@/app/components/StatusModalContext';
+ circular_dependency_warning: false
 
 /* ─── Types ─── */
 interface FormStep {
@@ -274,11 +276,11 @@ export default function ManageFormsPage() {
   const [schema, setSchema] = useState<FormSchema | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [editingStepLabel, setEditingStepLabel] = useState('');
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
+  const { showSuccess, showError, showConfirm, setLoading: setGlobalLoading } = useStatusModal();
   
   // RBAC State
   const [permissions, setPermissions] = useState<any>(null);
@@ -314,7 +316,7 @@ export default function ManageFormsPage() {
       });
 
     // Fetch Schema
-    fetch(`/api/form-schema?name=${SCHEMA_NAME}`)
+    fetch(`/api/form-schema?name=${SCHEMA_NAME}&_t=${Date.now()}`, { cache: 'no-store' })
       .then(async res => {
         if (!mounted) return;
         if (res.ok) {
@@ -348,10 +350,6 @@ export default function ManageFormsPage() {
     setTimeout(() => { win.print(); win.close(); }, 500);
   };
 
-  const showToast = (type: 'success' | 'error', msg: string) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 4000);
-  };
 
   /* ─── Step operations ─── */
   const addStep = () => {
@@ -362,13 +360,27 @@ export default function ManageFormsPage() {
   };
 
   const deleteStep = (stepId: string) => {
-    if (!schema || schema.steps.length <= 1 || !permissions?.CanDelete) {
-      if (schema?.steps.length && schema.steps.length <= 1) showToast('error', 'Must have at least one step.');
+    if (!schema) return;
+    if (!permissions?.CanDelete) {
+      showError('Permission Denied', 'You do not have permission to delete form steps.');
       return;
     }
-    const newSteps = schema.steps.filter(s => s.id !== stepId).map((s, i) => ({ ...s, order: i + 1 }));
-    setSchema(prev => prev ? { ...prev, steps: newSteps, fields: prev.fields.filter(f => f.stepId !== stepId) } : prev);
-    setActiveStepId(newSteps[0]?.id ?? null);
+    if (schema.steps.length <= 1) {
+      showError('Action Blocked', 'At least one step is required for the form.');
+      return;
+    }
+
+    setSchema(prev => {
+      if (!prev) return prev;
+      const newSteps = prev.steps.filter(s => s.id !== stepId).map((s, i) => ({ ...s, order: i + 1 }));
+      const newFields = prev.fields.filter(f => f.stepId !== stepId);
+      
+      if (activeStepId === stepId) {
+         setActiveStepId(newSteps[0]?.id ?? null);
+      }
+      
+      return { ...prev, steps: newSteps, fields: newFields };
+    });
   };
 
   const renameStep = (stepId: string, label: string) => {
@@ -401,7 +413,10 @@ export default function ManageFormsPage() {
   }, [permissions]);
 
   const deleteField = (fieldId: string) => {
-    if (!permissions?.CanDelete) return;
+    if (!permissions?.CanDelete) {
+      showError('Permission Denied', 'You do not have permission to delete fields.');
+      return;
+    }
     setSchema(prev => prev ? { ...prev, fields: prev.fields.filter(f => f.id !== fieldId) } : prev);
   };
 
@@ -417,30 +432,58 @@ export default function ManageFormsPage() {
 
   /* ─── Save ─── */
   const handleSave = async () => {
-    if (!schema || !permissions?.CanEdit) return;
-    const empty = schema.fields.filter(f => !f.label.trim() || !f.name.trim());
-    if (empty.length > 0) {
-      showToast('error', `${empty.length} field(s) are missing a label or key name.`);
+    if (!schema) return;
+    if (!permissions?.CanEdit) {
+      showError('Permission Denied', 'You do not have permission to modify the form configuration.');
       return;
     }
-    setSaving(true);
-    try {
-      const method = schema.id ? 'PUT' : 'POST';
-      const body = schema.id
-        ? { id: schema.id, schema_name: schema.schema_name, steps: schema.steps, fields: schema.fields }
-        : { schema_name: schema.schema_name, steps: schema.steps, fields: schema.fields };
-      const res = await fetch('/api/form-schema', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
-      if (method === 'POST') {
-        const d = await res.json();
-        setSchema(prev => prev ? { ...prev, id: d.insertId } : prev);
-      }
-      showToast('success', 'Form schema saved successfully!');
-    } catch (err: any) {
-      showToast('error', err.message || 'Save failed.');
-    } finally {
-      setSaving(false);
+
+    const empty = schema.fields.filter(f => !f.label.trim() || !f.name.trim());
+    if (empty.length > 0) {
+      showError('Incomplete Fields', `${empty.length} field(s) are missing a label or key name. Please fix them before saving.`);
+      return;
     }
+
+    showConfirm(
+      'Save Changes?',
+      'Are you sure you want to save the new form layout? This will permanently update the form for all users.',
+      async () => {
+        setSaving(true);
+        setGlobalLoading(true);
+        try {
+          const method = schema.id ? 'PUT' : 'POST';
+          const body = { 
+            id: schema.id, 
+            schema_name: schema.schema_name, 
+            steps: schema.steps, 
+            fields: schema.fields 
+          };
+          
+          const res = await fetch('/api/form-schema', { 
+            method, 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(body) 
+          });
+          
+          if (!res.ok) { 
+            const e = await res.json(); 
+            throw new Error(e.error || 'Failed to save form schema'); 
+          }
+          
+          if (method === 'POST') {
+            const d = await res.json();
+            setSchema(prev => prev ? { ...prev, id: d.insertId } : prev);
+          }
+          
+          showSuccess('Settings Saved', 'The Patient Admission form configuration has been successfully updated.');
+        } catch (err: any) {
+          showError('Save Failed', err.message || 'An unexpected error occurred while saving.');
+        } finally {
+          setSaving(false);
+          setGlobalLoading(false);
+        }
+      }
+    );
   };
 
   /* ─── Derived data ─── */
@@ -488,13 +531,6 @@ export default function ManageFormsPage() {
         </div>
       </div>
 
-      {/* ── Toast ── */}
-      {toast && (
-        <div className={`mb-4 px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium flex-shrink-0 ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-          {toast.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
-          {toast.msg}
-        </div>
-      )}
 
       {/* ── Info Banner ── */}
       <div className="mb-4 px-4 py-3 rounded-xl flex items-start gap-3 text-sm text-slate-600 bg-blue-50 border border-blue-100 flex-shrink-0">

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, Loader2, Save, X, Check, AlertCircle, Info } from 'lucide-react';
 import Modal from './Modal';
+import Pagination from './Pagination';
 
 interface Permission {
   ModuleID: number;
@@ -40,6 +41,10 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   useEffect(() => {
     if (isOpen) {
@@ -208,7 +213,9 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {permissions.map((perm) => (
+                  {permissions
+                    .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+                    .map((perm) => (
                     <tr key={perm.ModuleID} className="hover:bg-slate-50/40 transition-colors">
                       <td className="px-6 py-4">
                         <span className="font-bold text-slate-700 text-sm">{perm.ModuleName}</span>
@@ -234,6 +241,22 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
                 </tbody>
               </table>
             </div>
+
+            {permissions.length > 0 && (
+              <div className="border border-slate-100 rounded-2xl overflow-hidden">
+                <Pagination 
+                  currentPage={currentPage}
+                  totalPages={Math.ceil(permissions.length / itemsPerPage)}
+                  onPageChange={setCurrentPage}
+                  onLimitChange={(limit) => {
+                    setItemsPerPage(limit);
+                    setCurrentPage(1);
+                  }}
+                  totalItems={permissions.length}
+                  itemsPerPage={itemsPerPage}
+                />
+              </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
               <button 

@@ -19,6 +19,8 @@ import FormStep from "./components/FormStep";
 import { InputField, SelectField, CheckboxField } from "./components/InputField";
 import PrintableForm from "./components/PrintableForm";
 import Modal from "./components/Modal";
+import { useStatusModal } from "./components/StatusModalContext";
+ circular_dependency_warning: false
 
 /* ─── Schema Types (mirrors /api/form-schema) ─── */
 interface FieldOption {
@@ -86,7 +88,7 @@ export default function AdmittingForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
-  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+  const { showSuccess, showError, setLoading: setGlobalLoading } = useStatusModal();
 
   /* ─── Fetch schema on mount ─── */
   useEffect(() => {
@@ -180,8 +182,7 @@ export default function AdmittingForm() {
     const stepErrors = validateCurrentStep();
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
-      setErrorMessage("Please complete all required fields correctly.");
-      setIsErrorModalOpen(true);
+      showError("Validation Error", "Please complete all required fields correctly before moving to the next step.");
       return;
     }
     setErrors({});
@@ -201,8 +202,7 @@ export default function AdmittingForm() {
     const allErrors = validateFields();
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors);
-      setErrorMessage("Some required fields are missing. Please review all steps.");
-      setIsErrorModalOpen(true);
+      showError("Submission Blocked", "Some required fields are missing. We have navigated you to the first error. Please review all steps.");
       
       // Find the first field with an error and navigate to its step
       const firstErrorField = schema?.fields.find(f => allErrors[f.name]);
@@ -228,12 +228,28 @@ export default function AdmittingForm() {
       });
 
       if (!res.ok) throw new Error("Failed to submit form");
-      setStatus("success");
-      setIsErrorModalOpen(false);
+      
+      showSuccess("Admission Successful", "The patient information has been successfully recorded in our system. You can now process another admission.");
+      
+      // Reset form
+      if (schema) {
+        const initial: FormData = {};
+        schema.fields.forEach((f) => {
+          if (f.type === "select" && f.options.length > 0) {
+            initial[f.name] = f.options[0].value;
+          } else {
+            initial[f.name] = "";
+          }
+        });
+        setFormData(initial);
+      }
+      setCurrentStepIndex(0);
+      setErrors({});
+      setStatus("idle");
     } catch (err) {
       console.error(err);
       setStatus("error");
-      setErrorMessage("Something went wrong while submitting the form. Please try again.");
+      showError("Submission Failed", "Something went wrong while submitting the form. Please try again or contact support.");
     }
   };
 
@@ -370,48 +386,6 @@ export default function AdmittingForm() {
     );
   }
 
-  /* ─── Success Screen ─── */
-  if (status === "success") {
-    return (
-      <div className="loginContainer">
-        <div className="backgroundOverlay" />
-        <div className="step-card max-w-md w-full text-center p-8 step-enter relative z-10">
-          <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 className="w-9 h-9 text-emerald-500" />
-          </div>
-          <h2 className="text-2xl font-bold text-[var(--neutral-900)] mb-2">
-            Admission Submitted
-          </h2>
-          <p className="text-[var(--neutral-500)] mb-8 text-sm leading-relaxed">
-            The patient information has been successfully recorded in our system.
-          </p>
-          <button
-            onClick={() => {
-              setStatus("idle");
-              // Reset form data back to schema defaults
-              const initial: FormData = {};
-              schema.fields.forEach((f) => {
-                if (f.type === "select" && f.options.length > 0) {
-                  initial[f.name] = f.options[0].value;
-                } else {
-                  initial[f.name] = "";
-                }
-              });
-              setFormData(initial);
-              setCurrentStepIndex(0);
-              setErrors({});
-            }}
-            suppressHydrationWarning={true}
-            className="w-full py-3 px-6 text-sm font-semibold text-white rounded-xl
-              bg-[#3b67a1] hover:bg-[#2b5a97]
-              transition-all shadow-md hover:shadow-lg cursor-pointer"
-          >
-            Submit Another Admission
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   /* ─── Main Render ─── */
   return (
@@ -503,44 +477,6 @@ export default function AdmittingForm() {
         </footer>
       </div>
 
-      {/* Error Modal */}
-      <Modal 
-        isOpen={isErrorModalOpen} 
-        onClose={() => setIsErrorModalOpen(false)} 
-        title="Form Validation Error"
-        width="max-w-md"
-      >
-        <div className="text-center py-4">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
-            <AlertCircle className="w-8 h-8" />
-          </div>
-          <h4 className="text-lg font-bold text-slate-800 mb-2">Required Fields Missing</h4>
-          <p className="text-slate-500 text-sm leading-relaxed">
-            {errorMessage}
-          </p>
-          <div className="mt-6 flex flex-col gap-2">
-            {Object.keys(errors).length > 0 && (
-              <div className="text-left bg-slate-50 p-4 rounded-xl border border-slate-100 max-h-[200px] overflow-y-auto custom-scrollbar">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Details:</p>
-                <ul className="space-y-1.5">
-                  {Object.entries(errors).map(([field, error]) => (
-                    <li key={field} className="text-xs text-red-600 font-semibold flex items-start gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1" />
-                      {error}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <button 
-              onClick={() => setIsErrorModalOpen(false)}
-              className="mt-4 w-full py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-100 active:scale-95 cursor-pointer"
-            >
-              Understand & Fix
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

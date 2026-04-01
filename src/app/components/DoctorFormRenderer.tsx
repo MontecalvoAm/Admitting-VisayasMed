@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import StepIndicator from './StepIndicator';
 import type { FormSchema, FormField, FormStep } from './FormSchemaBuilder';
+import { useStatusModal } from './StatusModalContext';
 
 interface Props {
   schemaName: string;
@@ -110,8 +111,9 @@ export default function DoctorFormRenderer({ schemaName, onClose }: Props) {
   const [currentStep, setCurrentStep] = useState(1);
   const [values, setValues] = useState<FormValues>({});
   const [errors, setErrors] = useState<ValidationErrors>({});
-  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const { showSuccess, showError, setLoading: setGlobalLoading } = useStatusModal();
 
   /* ─── Load schema ─── */
   useEffect(() => {
@@ -193,38 +195,22 @@ export default function DoctorFormRenderer({ schemaName, onClose }: Props) {
         body: JSON.stringify({ schema_name: schema.schema_name, data: values }),
       });
       if (!res.ok) throw new Error('Submission failed');
-      setStatus('success');
-    } catch {
+      
+      onClose();
+      showSuccess('Submission Successful', 'Your registration information has been recorded in our system. Thank you!');
+    } catch (err: any) {
       setStatus('error');
-      setErrorMessage('Something went wrong. Please try again.');
+      setErrorMessage(err.message || 'Something went wrong. Please try again.');
+      showError('Submission Error', 'We encountered an error while submitting your form. Please check your connection and try again.');
     }
   };
+ circular_dependency_warning: false
 
   /* ─── Step definitions for indicator ─── */
   const stepIndicatorSteps = schema
     ? [...schema.steps.map(s => ({ label: s.label, shortLabel: s.label.split(' ')[0] })), { label: 'Review', shortLabel: 'Review' }]
     : [];
 
-  /* ─── Success ─── */
-  if (status === 'success') {
-    return (
-      <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
-          <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 className="w-9 h-9 text-emerald-500" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Form Submitted!</h2>
-          <p className="text-sm text-slate-500 mb-6">The form data has been recorded successfully.</p>
-          <button
-            onClick={onClose}
-            className="w-full py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-all"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>

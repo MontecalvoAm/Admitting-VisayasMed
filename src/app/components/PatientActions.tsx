@@ -6,12 +6,16 @@ import Modal from './Modal';
 import PatientForm from './PatientForm';
 import PrintableForm from './PrintableForm';
 import { useRouter } from 'next/navigation';
+import AuditTrail from './AuditTrail';
+import { useStatusModal } from './StatusModalContext';
 
 interface PatientActionsProps {
   patient: any;
+  isAdmission?: boolean;
+  onSuccess?: () => void;
 }
 
-const PatientActions: React.FC<PatientActionsProps> = ({ patient }) => {
+const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = false, onSuccess }) => {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -21,6 +25,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient }) => {
   const [editedPatient, setEditedPatient] = useState({ ...patient });
   const [permissions, setPermissions] = useState<any>(null);
   const [isLoadingPerms, setIsLoadingPerms] = useState(true);
+  const { showSuccess, showError, showConfirm, setLoading, hideModal } = useStatusModal();
   const router = useRouter();
 
   // Fetch permissions
@@ -57,20 +62,24 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient }) => {
     if (!permissions?.CanEdit) return;
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/patients/${patient.Id}`, {
+      const endpoint = isAdmission ? `/api/admissions/${patient.Id}` : `/api/patients/${patient.Id}`;
+      const res = await fetch(endpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editedPatient),
       });
       if (res.ok) {
         setIsEditOpen(false);
+        if (onSuccess) onSuccess();
         router.refresh();
+        showSuccess('Update Successful', 'Patient information has been correctly updated in the system.');
       } else {
-        alert('Failed to update patient information.');
+        const errorData = await res.json();
+        showError('Update Failed', errorData.error || 'Failed to update patient information.');
       }
     } catch (error) {
       console.error('Error updating patient:', error);
-      alert('An error occurred while updating.');
+      showError('System Error', 'An unexpected error occurred during the update process.');
     } finally {
       setIsSaving(false);
     }
@@ -78,60 +87,83 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient }) => {
 
   const handleReAdmit = async () => {
     if (!permissions?.CanAdd) return;
-    if (!confirm(`Are you sure you want to Re-Admit ${patient.LastName}, ${patient.GivenName}? This will create a new admission record.`)) {
-      return;
-    }
-    
-    setIsSaving(true);
-    try {
-      const { Id, CreatedAt, UpdatedAt, ...newData } = editedPatient;
-      const reAdmitData = {
-        ...newData,
-        PreviouslyAdmitted: true,
-        PreviousAdmissionDate: CreatedAt || patient.CreatedAt,
-      };
 
-      const res = await fetch('/api/patients', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reAdmitData),
-      });
+    showConfirm(
+      'Re-Admission Confirmation',
+      `Are you sure you want to Re-Admit ${patient.LastName}, ${patient.GivenName}? This will create a new admission record for this patient.`,
+      async () => {
+        setLoading(true);
+        try {
+          const { Id, CreatedAt, UpdatedAt, ...newData } = editedPatient;
+          const reAdmitData = {
+            ...newData,
+            PreviouslyAdmitted: true,
+            PreviousAdmissionDate: CreatedAt || patient.CreatedAt,
+          };
 
-      if (res.ok) {
-        setIsEditOpen(false);
-        router.refresh();
-        alert('Patient successfully re-admitted. A new record has been created.');
-      } else {
-        const errorData = await res.json();
-        alert(`Failed to re-admit patient: ${errorData.error || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('Error re-admitting patient:', error);
-      alert('An error occurred during re-admission.');
-    } finally {
-      setIsSaving(false);
-    }
+          const res = await fetch('/api/patients', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(reAdmitData),
+          });
+
+          if (res.ok) {
+            setIsEditOpen(false);
+            router.refresh();
+            hideModal();
+            setTimeout(() => {
+              showSuccess('Patient Re-Admitted', 'Patient successfully re-admitted. A new record has been created.');
+            }, 300);
+          } else {
+            const errorData = await res.json();
+            showError('Re-Admission Failed', errorData.error || 'Failed to re-admit patient.');
+          }
+        } catch (error) {
+          console.error('Error re-admitting patient:', error);
+          showError('System Error', 'An unexpected error occurred while processing re-admission.');
+        } finally {
+          setLoading(false);
+        }
+      },
+      'Confirm Re-Admit'
+    );
   };
+ circular_dependency_warning: false
 
   const handleDelete = async () => {
     if (!permissions?.CanDelete) return;
-    setIsDeleting(true);
-    try {
-      const res = await fetch(`/api/patients/${patient.Id}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        setIsDeleteOpen(false);
-        router.refresh();
-      } else {
-        alert('Failed to delete patient record.');
-      }
-    } catch (error) {
-      console.error('Error deleting patient:', error);
-      alert('An error occurred during deletion.');
-    } finally {
-      setIsDeleting(false);
-    }
+    
+    showConfirm(
+      'Confirm Deletion',
+      `Are you sure you want to delete the record of ${patient.LastName}, ${patient.GivenName}? This will move the record to the archive.`,
+      async () => {
+        setLoading(true);
+        try {
+          const endpoint = isAdmission ? `/api/admissions/${patient.Id}` : `/api/patients/${patient.Id}`;
+          const res = await fetch(endpoint, {
+            method: 'DELETE',
+          });
+          if (res.ok) {
+            setIsDeleteOpen(false);
+            if (onSuccess) onSuccess();
+            router.refresh();
+            hideModal();
+            setTimeout(() => {
+              showSuccess('Record Deleted', 'The patient record has been successfully moved to the system archive.');
+            }, 300);
+          } else {
+            const errorData = await res.json();
+            showError('Deletion Failed', errorData.error || 'Failed to delete record.');
+          }
+        } catch (error) {
+          console.error('Error deleting patient:', error);
+          showError('System Error', 'An unexpected error occurred during the deletion process.');
+        } finally {
+          setLoading(false);
+        }
+      },
+      'Delete Record'
+    );
   };
 
   const executePrint = async () => {
@@ -142,7 +174,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'PRINT',
-          resource: 'Patient',
+          resource: isAdmission ? 'Admission' : 'Patient',
           resourceId: patient.Id,
           details: `Admission form printed for ${patient.LastName}, ${patient.GivenName}.`
         })
@@ -207,7 +239,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient }) => {
 
       {!isLoadingPerms && permissions?.CanDelete && (
         <button 
-          onClick={() => setIsDeleteOpen(true)}
+          onClick={handleDelete}
           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
           title="Delete Record"
         >
@@ -256,8 +288,14 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient }) => {
         onClose={() => setIsViewOpen(false)} 
         title="Patient Details"
       >
-        <PatientForm formData={patient} isReadOnly={true} />
-        <div className="mt-8 flex justify-end">
+        <div className="max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar no-print">
+          <PatientForm formData={patient} isReadOnly={true} />
+          
+          <div className="mt-8">
+            <AuditTrail resource="Patient" id={patient.Id} />
+          </div>
+        </div>
+        <div className="mt-8 flex justify-end no-print">
           <button 
             onClick={() => setIsViewOpen(false)}
             className="px-6 py-2 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors"
@@ -296,39 +334,6 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient }) => {
         </div>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
-      <Modal 
-        isOpen={isDeleteOpen} 
-        onClose={() => setIsDeleteOpen(false)} 
-        title="Confirm Deletion"
-        width="max-w-md"
-      >
-        <div className="text-center py-4">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
-            <AlertTriangle className="w-8 h-8" />
-          </div>
-          <h4 className="text-lg font-bold text-slate-800 mb-2">Are you sure?</h4>
-          <p className="text-slate-500 text-sm">
-            This action will mark the record of <span className="font-bold text-slate-700">{patient.LastName}, {patient.GivenName}</span> as deleted. This cannot be easily undone.
-          </p>
-        </div>
-        <div className="mt-6 flex justify-center gap-3">
-          <button 
-            onClick={() => setIsDeleteOpen(false)}
-            className="px-6 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
-          >
-            No, Cancel
-          </button>
-          <button 
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all shadow-lg shadow-red-200 disabled:opacity-50"
-          >
-            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            Yes, Delete
-          </button>
-        </div>
-      </Modal>
     </div>
   );
 };

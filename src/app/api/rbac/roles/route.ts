@@ -3,15 +3,29 @@ import pool from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { getSession } from '@/lib/session';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const limit = parseInt(searchParams.get('limit') || '5');
+    const offset = parseInt(searchParams.get('offset') || '0');
+
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT r.*, (SELECT COUNT(*) FROM M_Users u WHERE u.RoleID = r.RoleID AND u.IsDeleted = false) as UserCount 
        FROM M_Roles r 
        WHERE r.IsDeleted = false 
-       ORDER BY r.RoleName`
+       ORDER BY r.RoleName
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
     );
-    return NextResponse.json(rows);
+
+    const [countRows] = await pool.query<RowDataPacket[]>(
+      'SELECT COUNT(*) as total FROM M_Roles WHERE IsDeleted = false'
+    );
+
+    return NextResponse.json({
+      roles: rows,
+      total: countRows[0].total
+    });
   } catch (error) {
     console.error('Error fetching roles:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
