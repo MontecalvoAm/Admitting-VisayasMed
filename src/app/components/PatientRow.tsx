@@ -25,7 +25,7 @@ const PatientRow: React.FC<PatientRowProps> = ({ patient }) => {
         if (res.ok) {
           const data = await res.json();
           // Filter out the current (latest) admission from history to avoid duplication
-          setHistory(data.filter((h: any) => Number(h.Id) !== Number(patient.Id)));
+          setHistory(data.filter((h: any) => Number(h.Id) !== Number(patient.CurrentAdmissionID)));
         }
       } catch (error) {
         console.error('Error fetching history:', error);
@@ -160,7 +160,14 @@ const PatientRow: React.FC<PatientRowProps> = ({ patient }) => {
 
                          <div className="flex items-center gap-2 pt-4 md:pt-0 border-t md:border-t-0 border-slate-50">
                             <span className="text-[10px] text-slate-400 font-medium mr-2 hidden lg:inline">Actions:</span>
-                            <PatientActions patient={record} />
+                            <PatientActions 
+                              patient={record} 
+                              isAdmission={true} 
+                              onSuccess={() => {
+                                // Instant removal for deletion
+                                setHistory(prev => prev.filter(h => h.Id !== record.Id));
+                              }}
+                            />
                          </div>
                        </div>
                     </div>

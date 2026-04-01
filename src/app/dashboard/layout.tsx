@@ -3,6 +3,7 @@ import Sidebar from '@/app/components/Sidebar';
 import { getSession } from '@/lib/session';
 import { redirect } from 'next/navigation';
 import { LogOut, Bell, Search, User, ShieldCheck } from 'lucide-react';
+import HeaderTitle from '@/app/components/HeaderTitle';
 
 export default async function DashboardLayout({
   children,
@@ -16,7 +17,15 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg-page)] text-slate-900 font-sans">
+    <div className="flex min-h-screen bg-[var(--bg-page)] text-slate-900 font-sans relative">
+      {/* Global Watermark */}
+      <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center opacity-[0.08] select-none overflow-hidden">
+        <img 
+          src="/Visayas%20Medical.png" 
+          alt="Watermark" 
+          className="w-[600px] h-auto object-contain grayscale"
+        />
+      </div>
       {/* Sidebar - Collapsible component */}
       <Sidebar 
         userName={`${session.firstName} ${session.lastName}`} 
@@ -30,13 +39,18 @@ export default async function DashboardLayout({
         
         {/* Top Navigation Bar */}
         <header className="sticky top-0 z-30 h-[var(--header-height)] min-h-[64px] glass-panel border-b border-[var(--glass-border)] px-4 md:px-8 flex items-center justify-between backdrop-blur-xl bg-white/80">
-          <div className="flex items-center gap-4 h-full">
+          <div className="flex items-center gap-6 h-full">
             {/* Brand visible only when sidebar is collapsed */}
             <div className="header-brand flex items-center gap-2 mr-4 animate-in fade-in slide-in-from-left-4 duration-500">
               <div className="w-8 h-8 flex items-center justify-center">
                 <img src="/Visayas%20Medical.png" alt="Logo" className="w-full h-full object-contain" />
               </div>
               <span className="text-sm font-black text-slate-800 tracking-tight uppercase">Visayasmed Hospital</span>
+            </div>
+
+            {/* Current Page Title */}
+            <div className="hidden lg:block">
+              <HeaderTitle />
             </div>
           </div>
 

@@ -6,6 +6,7 @@ import {
   Save, Settings, Type, Hash, Calendar, Phone, Mail, List,
   CheckSquare, AlertCircle, CheckCircle2, Loader2, Edit2, Check
 } from 'lucide-react';
+import { useStatusModal } from './StatusModalContext';
 
 /* ─── Types ─── */
 export interface FormStep {
@@ -259,7 +260,7 @@ export default function FormSchemaBuilder({ schemaName, onClose, onSaved }: Prop
   const [schema, setSchema] = useState<FormSchema | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
+  const { showSuccess, showError, showConfirm, hideModal, setLoading: setGlobalLoading } = useStatusModal();
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [editingStepLabel, setEditingStepLabel] = useState('');
@@ -267,7 +268,7 @@ export default function FormSchemaBuilder({ schemaName, onClose, onSaved }: Prop
   /* ─── Load schema on mount ─── */
   React.useEffect(() => {
     let mounted = true;
-    fetch(`/api/form-schema?name=${encodeURIComponent(schemaName)}`)
+    fetch(`/api/form-schema?name=${encodeURIComponent(schemaName)}&_t=${Date.now()}`, { cache: 'no-store' })
       .then(async res => {
         if (!mounted) return;
         if (res.ok) {
@@ -288,10 +289,6 @@ export default function FormSchemaBuilder({ schemaName, onClose, onSaved }: Prop
     return () => { mounted = false; };
   }, [schemaName]);
 
-  const showToast = (type: 'success' | 'error', msg: string) => {
-    setToast({ type, msg });
-    setTimeout(() => setToast(null), 3500);
-  };
 
   /* ─── Step Operations ─── */
   const addStep = () => {
@@ -308,7 +305,7 @@ export default function FormSchemaBuilder({ schemaName, onClose, onSaved }: Prop
   const deleteStep = (stepId: string) => {
     if (!schema) return;
     if (schema.steps.length <= 1) {
-      showToast('error', 'You must have at least one step.');
+      showError('Action Denied', 'You must have at least one step in the form.');
       return;
     }
     const newSteps = schema.steps.filter(s => s.id !== stepId).map((s, i) => ({ ...s, order: i + 1 }));
@@ -377,40 +374,46 @@ export default function FormSchemaBuilder({ schemaName, onClose, onSaved }: Prop
     // Quick validation
     const emptyFields = schema.fields.filter(f => !f.label.trim() || !f.name.trim());
     if (emptyFields.length > 0) {
-      showToast('error', `${emptyFields.length} field(s) have missing label or name. Please fill them in.`);
+      showError('Validation Error', `${emptyFields.length} field(s) have missing label or name. Please fill them in before saving.`);
       return;
     }
 
-    setSaving(true);
-    try {
-      const method = schema.id ? 'PUT' : 'POST';
-      const body = schema.id
-        ? { id: schema.id, schema_name: schema.schema_name, steps: schema.steps, fields: schema.fields }
-        : { schema_name: schema.schema_name, steps: schema.steps, fields: schema.fields };
+    showConfirm(
+      'Save Form Schema',
+      'Are you sure you want to save these changes? This will globally update the form layout for all users.',
+      async () => {
+        setSaving(true);
+        try {
+          const method = schema.id ? 'PUT' : 'POST';
+          const body = schema.id
+            ? { id: schema.id, schema_name: schema.schema_name, steps: schema.steps, fields: schema.fields }
+            : { schema_name: schema.schema_name, steps: schema.steps, fields: schema.fields };
 
-      const res = await fetch('/api/form-schema', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+          const res = await fetch('/api/form-schema', {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to save');
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Failed to save');
+          }
+
+          if (method === 'POST') {
+            const data = await res.json();
+            setSchema(prev => prev ? { ...prev, id: data.insertId } : prev);
+          }
+
+          showSuccess('Schema Saved', `The form structure for "${schema.schema_name}" has been successfully saved and activated.`);
+          onSaved?.(schema);
+        } catch (err: any) {
+          showError('Save Failed', err.message || 'Failed to save form schema.');
+        } finally {
+          setSaving(false);
+        }
       }
-
-      if (method === 'POST') {
-        const data = await res.json();
-        setSchema(prev => prev ? { ...prev, id: data.insertId } : prev);
-      }
-
-      showToast('success', 'Form schema saved successfully!');
-      onSaved?.(schema);
-    } catch (err: any) {
-      showToast('error', err.message || 'Failed to save schema.');
-    } finally {
-      setSaving(false);
-    }
+    );
   };
 
   /* ─── Render ─── */
@@ -446,13 +449,6 @@ export default function FormSchemaBuilder({ schemaName, onClose, onSaved }: Prop
           </div>
         </div>
 
-        {/* Toast */}
-        {toast && (
-          <div className={`mx-6 mt-3 px-4 py-3 rounded-xl flex items-center gap-3 text-sm font-medium ${toast.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
-            {toast.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
-            {toast.msg}
-          </div>
-        )}
 
         {loading ? (
           <div className="flex-1 flex items-center justify-center">

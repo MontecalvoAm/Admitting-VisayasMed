@@ -20,6 +20,8 @@ import {
   Database,
   Info
 } from 'lucide-react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import PaginationWrapper from '@/app/components/PaginationWrapper';
 // Remove date-fns import
 // import { format } from 'date-fns';
 
@@ -37,20 +39,27 @@ interface AuditLog {
 }
 
 export default function LogsPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
-  const [limit] = useState(25);
-  const [search, setSearch] = useState('');
-  const [actionFilter, setActionFilter] = useState('');
-  const [resourceFilter, setResourceFilter] = useState('');
+  
+  const currentPage = Number(searchParams.get('page')) || 1;
+  const itemsPerPage = Number(searchParams.get('limit')) || 5;
+  const offset = (currentPage - 1) * itemsPerPage;
+
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [actionFilter, setActionFilter] = useState(searchParams.get('action') || '');
+  const [resourceFilter, setResourceFilter] = useState(searchParams.get('resource') || '');
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        limit: limit.toString(),
+        limit: itemsPerPage.toString(),
         offset: offset.toString(),
         search,
         action: actionFilter,
@@ -67,16 +76,29 @@ export default function LogsPage() {
     } finally {
       setLoading(false);
     }
-  }, [offset, limit, search, actionFilter, resourceFilter]);
+  }, [offset, itemsPerPage, search, actionFilter, resourceFilter]);
 
   useEffect(() => {
     fetchLogs();
   }, [fetchLogs]);
 
+  const updateFilters = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
+    params.set('page', '1'); // Reset to first page when filter changes
+    router.push(`${pathname}?${params.toString()}`);
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setOffset(0);
-    fetchLogs();
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('search', search);
+    params.set('page', '1');
+    router.push(`${pathname}?${params.toString()}`);
   };
 
   const getActionIcon = (action: string) => {
@@ -133,7 +155,7 @@ export default function LogsPage() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
               type="text"
-              placeholder="Search users, details, resource IDs..."
+              placeholder="Search by user or activity details..."
               className="w-full pl-11 pr-4 py-3 rounded-2xl bg-white/80 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-vmed-blue/20 focus:border-vmed-blue transition-all text-sm font-medium"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -146,7 +168,7 @@ export default function LogsPage() {
               value={actionFilter}
               onChange={(e) => {
                 setActionFilter(e.target.value);
-                setOffset(0);
+                updateFilters('action', e.target.value);
               }}
             >
               <option value="">All Actions</option>
@@ -162,7 +184,7 @@ export default function LogsPage() {
               value={resourceFilter}
               onChange={(e) => {
                 setResourceFilter(e.target.value);
-                setOffset(0);
+                updateFilters('resource', e.target.value);
               }}
             >
               <option value="">All Resources</option>
@@ -184,7 +206,6 @@ export default function LogsPage() {
                 <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-wider">Timestamp</th>
                 <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-wider">User</th>
                 <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-wider">Action</th>
-                <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-wider">Resource</th>
                 <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-wider">Details</th>
                 <th className="px-6 py-4 text-[11px] font-black text-slate-400 uppercase tracking-wider">IP Address</th>
               </tr>
@@ -193,14 +214,14 @@ export default function LogsPage() {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    <td colSpan={6} className="px-6 py-4">
+                    <td colSpan={5} className="px-6 py-4">
                       <div className="h-5 bg-slate-100 rounded-lg w-full"></div>
                     </td>
                   </tr>
                 ))
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={5} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3 text-slate-400">
                       <Info className="w-10 h-10 opacity-20" />
                       <p className="font-bold text-sm">No logs found matching your filters.</p>
@@ -209,7 +230,7 @@ export default function LogsPage() {
                           setSearch('');
                           setActionFilter('');
                           setResourceFilter('');
-                          setOffset(0);
+                          router.push(pathname); // Clears all params
                         }}
                         className="text-vmed-blue hover:underline text-xs"
                       >
@@ -260,11 +281,6 @@ export default function LogsPage() {
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-0.5 rounded-full border text-[10px] font-black uppercase tracking-tight ${getResourceColor(log.Resource)}`}>
-                        {log.Resource} {log.ResourceID ? `#${log.ResourceID}` : ''}
-                      </span>
-                    </td>
                     <td className="px-6 py-4">
                       <p className="text-xs font-medium text-slate-600 max-w-sm">
                         {log.Details}
@@ -282,30 +298,13 @@ export default function LogsPage() {
           </table>
         </div>
 
-        {/* Pagination */}
-        {total > limit && (
-          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
-            <span className="text-xs font-bold text-slate-500">
-              Showing <span className="text-slate-800">{offset + 1}</span> to <span className="text-slate-800">{Math.min(offset + limit, total)}</span> of <span className="text-slate-800">{total}</span> entries
-            </span>
-            <div className="flex items-center gap-1">
-              <button 
-                onClick={() => setOffset(Math.max(0, offset - limit))}
-                disabled={offset === 0}
-                className="p-2 rounded-xl border border-slate-200 bg-white disabled:opacity-30 disabled:cursor-not-allowed hover:border-vmed-blue/30 text-slate-600 transition-all shadow-sm"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => setOffset(offset + limit)}
-                disabled={offset + limit >= total}
-                className="p-2 rounded-xl border border-slate-200 bg-white disabled:opacity-30 disabled:cursor-not-allowed hover:border-vmed-blue/30 text-slate-600 transition-all shadow-sm"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Pagination Wrapper */}
+        <PaginationWrapper 
+          currentPage={currentPage}
+          totalPages={Math.ceil(total / itemsPerPage)}
+          totalItems={total}
+          itemsPerPage={itemsPerPage}
+        />
       </div>
     </div>
   );

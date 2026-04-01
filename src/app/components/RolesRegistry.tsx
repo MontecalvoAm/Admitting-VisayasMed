@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Shield, Plus, Key, Edit, Trash2, Loader2, Search, Mail, Filter, AlertTriangle, Save, X, ShieldAlert } from 'lucide-react';
+import { Shield, Plus, Key, Edit, Trash2, Loader2, Search, Mail, Filter, AlertTriangle, Save, X, ShieldAlert, AlertCircle } from 'lucide-react';
 import PermissionModal from './PermissionModal';
 import Modal from './Modal';
+import PaginationWrapper from './PaginationWrapper';
 
 interface Role {
   RoleID: number;
@@ -12,8 +13,17 @@ interface Role {
   UserCount: number;
 }
 
-const RolesRegistry: React.FC = () => {
+interface RolesRegistryProps {
+  currentPage?: number;
+  itemsPerPage?: number;
+}
+
+const RolesRegistry: React.FC<RolesRegistryProps> = ({
+  currentPage = 1,
+  itemsPerPage = 5,
+}) => {
   const [roles, setRoles] = useState<Role[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
@@ -31,7 +41,7 @@ const RolesRegistry: React.FC = () => {
   useEffect(() => {
     fetchRoles();
     fetchMyPermissions();
-  }, []);
+  }, [currentPage, itemsPerPage]);
 
   const fetchMyPermissions = async () => {
     try {
@@ -52,9 +62,11 @@ const RolesRegistry: React.FC = () => {
   const fetchRoles = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/rbac/roles');
+      const offset = (currentPage - 1) * itemsPerPage;
+      const res = await fetch(`/api/rbac/roles?limit=${itemsPerPage}&offset=${offset}`);
       const data = await res.json();
-      setRoles(data);
+      setRoles(data.roles);
+      setTotalItems(data.total);
     } catch (err) {
       console.error('Error fetching roles:', err);
     } finally {
@@ -266,6 +278,15 @@ const RolesRegistry: React.FC = () => {
             </tbody>
           </table>
         </div>
+        
+        {totalItems > 0 && (
+          <PaginationWrapper 
+            currentPage={currentPage} 
+            totalPages={Math.ceil(totalItems / itemsPerPage)} 
+            totalItems={totalItems} 
+            itemsPerPage={itemsPerPage} 
+          />
+        )}
       </div>
 
       {/* Role Create/Edit Modal */}

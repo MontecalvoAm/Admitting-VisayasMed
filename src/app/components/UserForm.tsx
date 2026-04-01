@@ -6,11 +6,17 @@ import { InputField, SelectField } from './InputField';
 
 interface UserFormProps {
   formData: any;
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   isEdit?: boolean;
+  isReadOnly?: boolean;
 }
 
-const UserForm: React.FC<UserFormProps> = ({ formData, onChange, isEdit = false }) => {
+const UserForm: React.FC<UserFormProps> = ({ 
+  formData, 
+  onChange = () => {}, 
+  isEdit = false, 
+  isReadOnly = false 
+}) => {
   const [roles, setRoles] = useState<any[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
 
@@ -24,7 +30,7 @@ const UserForm: React.FC<UserFormProps> = ({ formData, onChange, isEdit = false 
       const res = await fetch('/api/rbac/roles');
       if (res.ok) {
         const data = await res.json();
-        setRoles(data);
+        setRoles(data.roles || []);
         
         // If it's a new user and no role is selected, select the first role as default or staff
         if (!isEdit && !formData.RoleID && data.length > 0) {
@@ -73,6 +79,7 @@ const UserForm: React.FC<UserFormProps> = ({ formData, onChange, isEdit = false 
           value={formData.FirstName || ''} 
           onChange={onChange} 
           required 
+          isReadOnly={isReadOnly}
           icon={User}
           className="bg-white"
         />
@@ -82,6 +89,7 @@ const UserForm: React.FC<UserFormProps> = ({ formData, onChange, isEdit = false 
           value={formData.LastName || ''} 
           onChange={onChange} 
           required 
+          isReadOnly={isReadOnly}
           icon={User}
           className="bg-white"
         />
@@ -94,11 +102,12 @@ const UserForm: React.FC<UserFormProps> = ({ formData, onChange, isEdit = false 
         value={formData.Email || ''} 
         onChange={onChange} 
         required 
+        isReadOnly={isReadOnly}
         icon={Mail}
         className="bg-white"
       />
 
-      {!isEdit && (
+      {!isEdit && !isReadOnly && (
         <InputField 
           label="Password" 
           name="Password" 
@@ -122,6 +131,7 @@ const UserForm: React.FC<UserFormProps> = ({ formData, onChange, isEdit = false 
           value={formData.RoleID ? String(formData.RoleID) : ''}
           onChange={onChange}
           required
+          isReadOnly={isReadOnly}
           icon={Shield}
           options={roles.map(r => ({
             value: String(r.RoleID),

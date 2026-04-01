@@ -16,13 +16,29 @@ import {
 import Link from 'next/link';
 
 async function getStats() {
-  const [patientCount] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM M_Patients');
-  const [todayCount] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM M_Patients WHERE DATE(CreatedAt) = CURDATE()');
-  const [recentAdmissions] = await pool.query<RowDataPacket[]>('SELECT * FROM M_Patients ORDER BY CreatedAt DESC LIMIT 5');
+  // Total unique patients
+  const [patientCount] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM M_Patients WHERE IsDeleted = 0');
+  
+  // Total admissions TODAY
+  const [todayCount] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM M_Admissions WHERE DATE(AdmittedAt) = CURDATE() AND IsDeleted = 0');
+  
+  // Total system users
+  const [userCount] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM M_Users WHERE IsDeleted = 0');
+  
+  // Recent admissions with patient names (alias AdmissionID as Id and AdmittedAt as CreatedAt for UI compatibility)
+  const [recentAdmissions] = await pool.query<RowDataPacket[]>(`
+    SELECT a.*, a.AdmissionID as Id, a.AdmittedAt as CreatedAt, p.LastName, p.GivenName, p.Sex
+    FROM M_Admissions a
+    JOIN M_Patients p ON a.PatientID = p.PatientID
+    WHERE a.IsDeleted = 0 
+    ORDER BY a.AdmittedAt DESC 
+    LIMIT 5
+  `);
   
   return {
     totalPatients: patientCount[0].count,
     todayAdmissions: todayCount[0].count,
+    totalUsers: userCount[0].count,
     recentAdmissions
   };
 }
@@ -35,17 +51,37 @@ export default async function DashboardPage() {
     redirect('/login');
   }
 
-  const { totalPatients, todayAdmissions, recentAdmissions } = await getStats();
+  const { totalPatients, todayAdmissions, totalUsers, recentAdmissions } = await getStats();
 
   const stats = [
-    { label: 'Total Patients', value: totalPatients, icon: Users, color: 'text-vmed-blue-dark', bg: 'bg-blue-50' },
-    { label: 'Admissions Today', value: todayAdmissions, icon: Calendar, color: 'text-vmed-green', bg: 'bg-emerald-50' },
-    { label: 'Active Doctors', value: '12', icon: UserRound, color: 'text-vmed-blue-light', bg: 'bg-indigo-50' },
-    { label: 'Growth Rate', value: '+12%', icon: TrendingUp, color: 'text-vmed-grey', bg: 'bg-slate-50' },
+    { 
+      label: 'Total Patients', 
+      value: totalPatients, 
+      icon: Users, 
+      color: 'text-vmed-blue-dark', 
+      bg: 'bg-blue-50',
+      trend: 'Lifetime'
+    },
+    { 
+      label: 'Admissions Today', 
+      value: todayAdmissions, 
+      icon: Calendar, 
+      color: 'text-vmed-green', 
+      bg: 'bg-emerald-50',
+      trend: '+ Live'
+    },
+    { 
+      label: 'System Users', 
+      value: totalUsers, 
+      icon: UserRound, 
+      color: 'text-purple-600', 
+      bg: 'bg-purple-50',
+      trend: 'Active Accounts'
+    },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative z-10">
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -71,23 +107,34 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat, i) => (
-          <div key={i} className="glass-panel p-6 rounded-3xl group shadow-sm hover:shadow-md transition-all border border-slate-100/50">
-            <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 rounded-2xl ${stat.bg} flex items-center justify-center ${stat.color} shadow-inner`}>
+          <div key={i} className="glass-panel p-6 rounded-3xl group shadow-sm hover:shadow-md transition-all border border-slate-100/50 overflow-hidden relative">
+            {/* Background Decorative Element */}
+            <div className={`absolute -right-4 -bottom-4 w-24 h-24 rounded-full ${stat.bg} opacity-20 blur-2xl group-hover:scale-150 transition-transform duration-500`}></div>
+            
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <div className={`w-12 h-12 rounded-2xl ${stat.bg} flex items-center justify-center ${stat.color} shadow-inner group-hover:scale-110 transition-transform`}>
                 <stat.icon className="w-6 h-6" />
               </div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Live Update</span>
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.trend}</span>
+              </div>
             </div>
-            <div className="text-3xl font-black text-slate-800 mb-1">{stat.value}</div>
-            <div className="text-sm font-bold text-slate-500">{stat.label}</div>
+            
+            <div className="relative z-10">
+              <div className="text-3xl font-black text-slate-800 mb-1 flex items-baseline gap-2">
+                {stat.value}
+              </div>
+              <div className="text-sm font-bold text-slate-500">{stat.label}</div>
+            </div>
           </div>
         ))}
       </div>
 
+
       {/* Main Content Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10">
         {/* Recent Admissions */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
@@ -107,7 +154,7 @@ export default async function DashboardPage() {
                 recentAdmissions.map((record) => (
                   <div key={record.Id} className="p-4 hover:bg-slate-50/50 transition-colors flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-xs shadow-inner">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-xs shadow-inner uppercase">
                         {record.LastName[0]}{record.GivenName[0]}
                       </div>
                       <div>
@@ -132,8 +179,8 @@ export default async function DashboardPage() {
           <div className="grid grid-cols-1 gap-3">
             {[
               { label: 'Register Patient', desc: 'Add new admission record', icon: Plus, link: '/dashboard/patients' },
-              { label: 'Staff Management', desc: 'Update duty schedules', icon: UserRound, link: '/dashboard/doctors' },
-              { label: 'System Reports', desc: 'Download monthly analytics', icon: Download, link: '/dashboard' },
+              { label: 'Staff Management', desc: 'Update duty schedules', icon: UserRound, link: '/dashboard/users' },
+              { label: 'System Reports', desc: 'Download monthly analytics', icon: Download, link: '/dashboard/logs' },
             ].map((action, i) => (
               <Link 
                 key={i} 

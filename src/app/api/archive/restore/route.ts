@@ -1,0 +1,99 @@
+import { NextRequest, NextResponse } from 'next/server';
+import pool from '@/lib/db';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
+import { getSession } from '@/lib/session';
+import { hasPermission } from '@/lib/rbac';
+import { recordAuditLog } from '@/lib/auditLogger';
+
+export async function POST(req: NextRequest) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Check permission for Archive module (Edit permission needed to Restore)
+  const canRestore = await hasPermission(session.userId, session.roleId, 'Archive', 'Edit');
+  if (!canRestore) {
+    return NextResponse.json({ error: 'Permission denied' }, { status: 403 });
+  }
+
+  try {
+    const { type, id } = await req.json();
+
+    if (!type || !id) {
+      return NextResponse.json({ error: 'Type and ID are required' }, { status: 400 });
+    }
+
+    let tableName = '';
+    let idColumn = '';
+    let resourceName = '';
+    let nameLog = '';
+
+    if (type === 'users') {
+      tableName = 'M_Users';
+      idColumn = 'UserID';
+      resourceName = 'User';
+      
+      const [userRows] = await pool.query<RowDataPacket[]>(
+        `SELECT FirstName, LastName FROM ${tableName} WHERE ${idColumn} = ?`,
+        [id]
+      );
+      nameLog = userRows.length > 0 ? `${userRows[0].FirstName} ${userRows[0].LastName}` : 'Unknown User';
+    } else if (type === 'patients') {
+      tableName = 'M_Patients';
+      idColumn = 'PatientID';
+      resourceName = 'Patient';
+      
+      const [patientRows] = await pool.query<RowDataPacket[]>(
+        `SELECT LastName, GivenName FROM ${tableName} WHERE ${idColumn} = ?`,
+        [id]
+      );
+      nameLog = patientRows.length > 0 ? `${patientRows[0].LastName}, ${patientRows[0].GivenName}` : 'Unknown Patient';
+    } else {
+      return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
+    }
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [result] = await connection.execute<ResultSetHeader>(
+        `UPDATE ${tableName} SET IsDeleted = false, DeletedAt = NULL, DeletedBy = NULL WHERE ${idColumn} = ?`,
+        [id]
+      );
+
+      if (result.affectedRows === 0) {
+        await connection.rollback();
+        return NextResponse.json({ error: 'Record not found' }, { status: 404 });
+      }
+
+      // If patient, also restore all their admissions
+      if (type === 'patients') {
+        await connection.execute(
+          'UPDATE M_Admissions SET IsDeleted = false, DeletedAt = NULL, DeletedBy = NULL WHERE PatientID = ?',
+          [id]
+        );
+      }
+
+      await connection.commit();
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+
+    // Record Audit Log
+    await recordAuditLog({
+      action: 'RESTORE' as any,
+      resource: resourceName as any,
+      resourceId: id.toString(),
+      details: `${resourceName} record restored from archive: ${nameLog}`
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error restoring record:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}

@@ -9,8 +9,13 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    // Join with latest admission to get full historical context
     const [rows] = await pool.query<RowDataPacket[]>(
-      'SELECT * FROM M_Patients WHERE Id = ? AND IsDeleted = false',
+      `SELECT p.*, a.* 
+       FROM M_Patients p
+       LEFT JOIN M_Admissions a ON p.PatientID = a.PatientID 
+       WHERE p.PatientID = ? AND p.IsDeleted = false
+       ORDER BY a.AdmittedAt DESC LIMIT 1`,
       [id]
     );
 
@@ -29,61 +34,79 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const connection = await pool.getConnection();
   try {
     const { id } = await params;
     const data = await req.json();
 
-    // Basic validation
     if (!data.LastName || !data.GivenName) {
       return NextResponse.json({ error: 'LastName and GivenName are required.' }, { status: 400 });
     }
 
-    const query = `
+    await connection.beginTransaction();
+
+    // 1. Update Patient Demographics
+    const patientQuery = `
       UPDATE M_Patients SET 
-        LastName = ?, GivenName = ?, MiddleName = ?, Suffix = ?, Age = ?, Birthday = ?, BirthPlace = ?, Sex = ?, 
+        LastName = ?, GivenName = ?, MiddleName = ?, Suffix = ?, Birthday = ?, BirthPlace = ?, Sex = ?, 
         ContactNumber = ?, CityAddress = ?, ProvincialAddress = ?, CivilStatus = ?, Religion = ?, Citizenship = ?, Occupation = ?,
         FatherFamilyName = ?, FatherGivenName = ?, FatherMiddleName = ?, FatherContact = ?,
         MotherFamilyName = ?, MotherGivenName = ?, MotherMiddleName = ?, MotherContact = ?,
         SpouseFamilyName = ?, SpouseGivenName = ?, SpouseMiddleName = ?, SpouseContact = ?,
         EmergencyContactName = ?, EmergencyRelation = ?, EmergencyContactNumber = ?,
         ResponsibleName = ?, ResponsibleContact = ?, ResponsibleAddress = ?, ResponsibleRelation = ?,
-        AttendingPhysician = ?, PreviouslyAdmitted = ?, PreviousAdmissionDate = ?, PhilHealthStatus = ?, 
-        HmoCompany = ?, VmcBenefit = ?, ServiceCaseType = ?,
         UpdatedAt = CURRENT_TIMESTAMP
-      WHERE Id = ?
+      WHERE PatientID = ?
     `;
 
-    const values = [
-      data.LastName || null, data.GivenName || null, data.MiddleName || null, data.Suffix || null, data.Age || null, data.Birthday || null, data.BirthPlace || null, data.Sex || null, 
+    const patientValues = [
+      data.LastName || null, data.GivenName || null, data.MiddleName || null, data.Suffix || null, data.Birthday || null, data.BirthPlace || null, data.Sex || null, 
       data.ContactNumber || null, data.CityAddress || null, data.ProvincialAddress || null, data.CivilStatus || null, data.Religion || null, data.Citizenship || null, data.Occupation || null,
       data.FatherFamilyName || null, data.FatherGivenName || null, data.FatherMiddleName || null, data.FatherContact || null,
       data.MotherFamilyName || null, data.MotherGivenName || null, data.MotherMiddleName || null, data.MotherContact || null,
       data.SpouseFamilyName || null, data.SpouseGivenName || null, data.SpouseMiddleName || null, data.SpouseContact || null,
       data.EmergencyContactName || null, data.EmergencyRelation || null, data.EmergencyContactNumber || null,
       data.ResponsibleName || null, data.ResponsibleContact || null, data.ResponsibleAddress || null, data.ResponsibleRelation || null,
-      data.AttendingPhysician || null, data.PreviouslyAdmitted || false, data.PreviousAdmissionDate || null, data.PhilHealthStatus || null, 
-      data.HmoCompany || false, data.VmcBenefit || null, data.ServiceCaseType || null,
       id
     ];
 
-    const [result] = await pool.execute<ResultSetHeader>(query, values);
+    await connection.execute(patientQuery, patientValues);
 
-    if (result.affectedRows === 0) {
-      return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
-    }
+    // 2. Update Latest Admission (if it exists)
+    // In a truly scalable system, you might want to version this or only update the specific admission ID
+    // For now, we update the most recent one to maintain compatible behavior with the legacy single-row model
+    const admissionQuery = `
+      UPDATE M_Admissions SET 
+        Age = ?, AttendingPhysician = ?, PreviouslyAdmitted = ?, PreviousAdmissionDate = ?, PhilHealthStatus = ?, 
+        HmoCompany = ?, VmcBenefit = ?, ServiceCaseType = ?,
+        UpdatedAt = CURRENT_TIMESTAMP
+      WHERE PatientID = ?
+      ORDER BY AdmittedAt DESC LIMIT 1
+    `;
 
-    // Record Audit Log
+    await connection.execute(admissionQuery, [
+      data.Age || null, data.AttendingPhysician || null, data.PreviouslyAdmitted || false, 
+      data.PreviousAdmissionDate || null, data.PhilHealthStatus || null, 
+      data.HmoCompany || false, data.VmcBenefit || null, data.ServiceCaseType || null,
+      id
+    ]);
+
+    await connection.commit();
+
     await recordAuditLog({
       action: 'UPDATE',
       resource: 'Patient',
       resourceId: id,
-      details: `Patient record updated for ${data.LastName}, ${data.GivenName}.`
+      details: `Normalized patient and admission record updated for ${data.LastName}, ${data.GivenName}.`
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    await connection.rollback();
     console.error('Error updating patient:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  } finally {
+    connection.release();
   }
 }
 
@@ -96,14 +119,20 @@ export async function DELETE(
     
     // Get patient name for the log before deleting (soft)
     const [patientRows] = await pool.query<RowDataPacket[]>(
-      'SELECT LastName, GivenName FROM M_Patients WHERE Id = ?',
+      'SELECT LastName, GivenName FROM M_Patients WHERE PatientID = ?',
       [id]
     );
     const patientName = patientRows.length > 0 ? `${patientRows[0].LastName}, ${patientRows[0].GivenName}` : 'Unknown';
 
-    // Soft delete
+    // Soft delete patient
     const [result] = await pool.execute<ResultSetHeader>(
-      'UPDATE M_Patients SET IsDeleted = true, DeletedAt = CURRENT_TIMESTAMP WHERE Id = ?',
+      'UPDATE M_Patients SET IsDeleted = true WHERE PatientID = ?',
+      [id]
+    );
+
+    // Soft delete admissions
+    await pool.execute(
+      'UPDATE M_Admissions SET IsDeleted = true WHERE PatientID = ?',
       [id]
     );
 
