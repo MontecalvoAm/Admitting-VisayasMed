@@ -7,11 +7,17 @@ export default async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
   const isProtectedRoute = protectedRoutes.some((route) => path.startsWith(route));
   
-  if (isProtectedRoute) {
+  const isAuthRoute = path.startsWith('/api/auth');
+  const isProtectedApiRoute = path.startsWith('/api') && !isAuthRoute;
+
+  if (isProtectedRoute || isProtectedApiRoute) {
     const cookie = req.cookies.get("session")?.value;
     const session = await decrypt(cookie);
 
     if (!session?.userId) {
+      if (isProtectedApiRoute) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
       return NextResponse.redirect(new URL("/login", req.nextUrl));
     }
   }

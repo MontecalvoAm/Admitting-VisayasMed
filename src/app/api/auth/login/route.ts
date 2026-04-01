@@ -4,6 +4,15 @@ import bcrypt from "bcryptjs";
 import { createSession } from "@/lib/session";
 import { recordAuditLog } from "@/lib/auditLogger";
 import { RowDataPacket } from "mysql2";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
+// Initialize Upstash Rate Limiter (5 attempts per 15 minutes)
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(5, "15 m"),
+  analytics: true,
+});
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,6 +20,31 @@ export async function POST(req: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+    }
+
+    // Rate Limiting by IP Address
+    const ip = req.headers.get("x-forwarded-for") ?? "127.0.0.1";
+    const { success, limit, reset, remaining } = await ratelimit.limit(`login_ratelimit_${ip}`);
+    
+    if (!success) {
+      await recordAuditLog({
+        action: 'FAILED_LOGIN',
+        resource: 'User',
+        resourceId: 0,
+        userName: 'Unknown',
+        details: `Rate limit exceeded for IP ${ip} targeting email ${email}.`
+      });
+      return NextResponse.json(
+        { error: "Too many login requests. Please try again later." },
+        { 
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": limit.toString(),
+            "X-RateLimit-Remaining": remaining.toString(),
+            "X-RateLimit-Reset": reset.toString()
+          }
+        }
+      );
     }
 
     const query = `
@@ -23,12 +57,27 @@ export async function POST(req: NextRequest) {
     const user = rows[0];
 
     if (!user) {
+      await recordAuditLog({
+        action: 'FAILED_LOGIN',
+        resource: 'User',
+        resourceId: 0,
+        userName: 'Unknown',
+        details: `Failed login attempt. No user found with email ${email}. IP: ${ip}`
+      });
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
     const isValidPassword = await bcrypt.compare(password, user.Password);
     
     if (!isValidPassword) {
+      await recordAuditLog({
+        action: 'FAILED_LOGIN',
+        resource: 'User',
+        resourceId: user.UserID,
+        userId: user.UserID,
+        userName: `${user.FirstName} ${user.LastName}`,
+        details: `Failed login attempt. Invalid password for ${email}. IP: ${ip}`
+      });
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 

@@ -145,8 +145,8 @@ export default async function PatientsPage({
                   </td>
                 </tr>
               ) : (
-                admissions.map((record: any) => (
-                  <PatientRow key={record.Id} patient={record} />
+                admissions.map((record: any, index: number) => (
+                  <PatientRow key={record.Id} patient={record} index={index} />
                 ))
               )}
             </tbody>
