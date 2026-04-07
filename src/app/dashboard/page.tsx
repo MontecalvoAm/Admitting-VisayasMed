@@ -27,15 +27,18 @@ async function getStats() {
   // Total system users
   const [userCount] = await pool.query<RowDataPacket[]>('SELECT COUNT(*) as count FROM M_Users WHERE IsDeleted = 0');
   
-  // Recent admissions with patient names (alias AdmissionID as Id and AdmittedAt as CreatedAt for UI compatibility)
-  const [recentAdmissions] = await pool.query<RowDataPacket[]>(`
-    SELECT a.*, a.AdmissionID as Id, a.AdmittedAt as CreatedAt, p.LastName, p.GivenName, p.Sex
+  // Recent admissions with full details (alias AdmissionID as Id and AdmittedAt as CreatedAt for UI compatibility)
+  const [rows] = await pool.query<RowDataPacket[]>(`
+    SELECT p.*, a.*, a.AdmissionID as Id, a.AdmittedAt as CreatedAt
     FROM M_Admissions a
     JOIN M_Patients p ON a.PatientID = p.PatientID
     WHERE a.IsDeleted = 0 
     ORDER BY a.AdmittedAt DESC 
     LIMIT 5
   `);
+  
+  // Clean serialization for RowDataPacket
+  const recentAdmissions = JSON.parse(JSON.stringify(rows));
   
   return {
     totalPatients: patientCount[0].count,
