@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { ResultSetHeader } from 'mysql2';
+import { getSession } from '@/lib/session';
+import { UserSchema } from '@/lib/schemas';
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const data = await req.json();
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (!data.Email || !data.FirstName || !data.LastName) {
-      return NextResponse.json({ error: 'FirstName, LastName, and Email are required.' }, { status: 400 });
+    const { id } = await params;
+    const rawData = await req.json();
+
+    const parsed = UserSchema.safeParse(rawData);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation Error', details: parsed.error.format() }, { status: 400 });
     }
+    const data = parsed.data;
 
     const query = `
       UPDATE M_Users SET 
@@ -45,6 +52,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { id } = await params;
     
     // Soft delete

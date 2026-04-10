@@ -13,6 +13,7 @@ import {
   Loader2,
   ClipboardCheck,
   X,
+  Layout,
 } from "lucide-react";
 import StepIndicator from "./components/StepIndicator";
 import FormStep from "./components/FormStep";
@@ -333,14 +334,52 @@ export default function AdmittingForm() {
       2: "Emergency contact details and account responsibility",
     };
 
+    // Group fields by section headers
+    const renderContent = () => {
+      const parts: React.ReactNode[] = [];
+      let currentGroup: SchemaField[] = [];
+
+      const flushGroup = (index: number) => {
+        if (currentGroup.length > 0) {
+          parts.push(
+            <div key={`group-${index}`} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8 text-left">
+              {currentGroup.map((f) => renderDynamicField(f))}
+            </div>
+          );
+          currentGroup = [];
+        }
+      };
+
+      stepFields.forEach((field, idx) => {
+        if (field.type === ("section" as any)) {
+          // Flush existing group
+          flushGroup(idx);
+          // Add section header
+          parts.push(
+            <div key={`section-${field.id}`} className={`col-span-1 sm:col-span-2 lg:col-span-4 flex items-center gap-2 ${parts.length === 0 ? "mt-1" : "mt-8"} mb-4 pb-2 border-b border-slate-100`}>
+              <div className="p-1.5 bg-slate-50 rounded-lg">
+                <Layout className="w-4 h-4 text-slate-500" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">{field.label}</h3>
+            </div>
+          );
+        } else {
+          currentGroup.push(field);
+        }
+      });
+
+      flushGroup(-1);
+      return parts;
+    };
+
     return (
       <FormStep
         title={currentStep.label}
         description={descriptions[currentStepIndex] ?? "Fill in the required fields"}
         Icon={StepIcon}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8 text-left">
-          {stepFields.map((field) => renderDynamicField(field))}
+        <div className="space-y-4">
+          {renderContent()}
         </div>
       </FormStep>
     );

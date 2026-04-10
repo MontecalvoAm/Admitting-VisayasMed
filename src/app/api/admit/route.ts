@@ -1,15 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { getSession } from '@/lib/session';
+import { AdmitSchema } from '@/lib/schemas';
+import { z } from 'zod';
+import { hasPermission } from '@/lib/rbac';
 
 export async function POST(req: NextRequest) {
   try {
-    const data = await req.json();
-
-    // Basic validation
-    if (!data.LastName || !data.GivenName) {
-      return NextResponse.json({ error: 'LastName and GivenName are required.' }, { status: 400 });
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Optional: Only allow if they have 'Admissions' permission
+    // const hasPerm = await hasPermission(session.userId, session.roleId, 'Admitting', 'Add');
+    // if (!hasPerm) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const rawData = await req.json();
+    
+    // Zod validation
+    const parsed = AdmitSchema.safeParse(rawData);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation Error', details: parsed.error.format() }, { status: 400 });
+    }
+    
+    const data = parsed.data;
 
     // 1. Transactional approach: Find or Create Patient, then record Admission
     const connection = await pool.getConnection();

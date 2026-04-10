@@ -2,14 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { recordAuditLog } from '@/lib/auditLogger';
+import { getSession } from '@/lib/session';
+import { AdmitSchema } from '@/lib/schemas';
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { id } = await params;
-    const data = await req.json();
+    const rawData = await req.json();
+
+    const parsed = AdmitSchema.safeParse(rawData);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation Error', details: parsed.error.format() }, { status: 400 });
+    }
+    const data = parsed.data;
 
     const query = `
       UPDATE M_Admissions SET 
@@ -52,12 +63,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { id } = await params;
     
     // Soft delete only this specific admission
     const [result] = await pool.execute<ResultSetHeader>(
-      'UPDATE M_Admissions SET IsDeleted = true, DeletedBy = "System/User", DeletedAt = CURRENT_TIMESTAMP WHERE AdmissionID = ?',
-      [id]
+      'UPDATE M_Admissions SET IsDeleted = true, DeletedBy = ?, DeletedAt = CURRENT_TIMESTAMP WHERE AdmissionID = ?',
+      [`Session:${session.userId}`, id]
     );
 
     if (result.affectedRows === 0) {

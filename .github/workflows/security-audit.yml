@@ -1,0 +1,33 @@
+name: Security Audit and CI Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build_and_audit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Clean Install Dependencies
+      run: npm ci
+      
+    - name: Audit Dependencies (A03 Supply Chain)
+      run: npm audit --audit-level=high
+      
+    - name: Run Linting
+      run: npm run lint
+      
+    - name: Verify Build (A08 Integrity)
+      run: npm run build

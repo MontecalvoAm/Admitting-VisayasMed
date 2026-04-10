@@ -2,15 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { recordAuditLog } from '@/lib/auditLogger';
+import { getSession } from '@/lib/session';
+import { AdmitSchema } from '@/lib/schemas';
 
 export async function POST(req: NextRequest) {
   const connection = await pool.getConnection();
   try {
-    const data = await req.json();
-
-    if (!data.LastName || !data.GivenName) {
-      return NextResponse.json({ error: 'LastName and GivenName are required.' }, { status: 400 });
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const rawData = await req.json();
+    const parsed = AdmitSchema.safeParse(rawData);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation Error', details: parsed.error.format() }, { status: 400 });
+    }
+    const data = parsed.data;
 
     await connection.beginTransaction();
 

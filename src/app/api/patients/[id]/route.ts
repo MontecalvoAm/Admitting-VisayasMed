@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { recordAuditLog } from '@/lib/auditLogger';
+import { getSession } from '@/lib/session';
+import { AdmitSchema } from '@/lib/schemas';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { id } = await params;
     // Join with latest admission to get full historical context
     const [rows] = await pool.query<RowDataPacket[]>(
@@ -36,12 +41,17 @@ export async function PUT(
 ) {
   const connection = await pool.getConnection();
   try {
-    const { id } = await params;
-    const data = await req.json();
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (!data.LastName || !data.GivenName) {
-      return NextResponse.json({ error: 'LastName and GivenName are required.' }, { status: 400 });
+    const { id } = await params;
+    const rawData = await req.json();
+
+    const parsed = AdmitSchema.safeParse(rawData);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation Error', details: parsed.error.format() }, { status: 400 });
     }
+    const data = parsed.data;
 
     await connection.beginTransaction();
 
@@ -115,6 +125,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { id } = await params;
     
     // Get patient name for the log before deleting (soft)

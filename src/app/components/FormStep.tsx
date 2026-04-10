@@ -33,7 +33,7 @@ export default function FormStep({ title, description, Icon, children }: FormSte
       </div>
 
       {/* Content */}
-      <div className="px-8 py-10">{children}</div>
+      <div className="px-8 py-8">{children}</div>
     </div>
   );
 }

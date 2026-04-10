@@ -5,7 +5,7 @@ import {
   Save, Plus, Trash2, GripVertical, ChevronDown, ChevronUp,
   Type, Hash, Calendar, Phone, Mail, List, CheckSquare,
   AlertCircle, CheckCircle2, Loader2, Edit2, Check, X,
-  ClipboardList, Info, Printer, ShieldAlert
+  ClipboardList, Info, Printer, ShieldAlert, Layout
 } from 'lucide-react';
 import PrintableForm from '@/app/components/PrintableForm';
 import { useStatusModal } from '@/app/components/StatusModalContext';
@@ -52,6 +52,7 @@ const FIELD_TYPES: { value: FormField['type']; label: string; icon: any; color: 
   { value: 'email',    label: 'Email',    icon: Mail,        color: 'bg-pink-50 text-pink-700 border-pink-200' },
   { value: 'select',   label: 'Dropdown', icon: List,        color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   { value: 'checkbox', label: 'Checkbox', icon: CheckSquare, color: 'bg-teal-50 text-teal-700 border-teal-200' },
+  { value: 'section',  label: 'Section Header', icon: Layout, color: 'bg-slate-900 text-white border-slate-800' },
 ];
 
 function nanoid() {
