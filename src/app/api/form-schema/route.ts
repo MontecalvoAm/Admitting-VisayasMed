@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { PoolConnection } from 'mysql2/promise';
+
+interface FormStep { id: string; label?: string; order?: number; }
+interface FormField { id: string; stepId: string; label?: string; name?: string; type?: string; required?: boolean; placeholder?: string; options?: unknown; }
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,7 +22,7 @@ export async function GET(req: NextRequest) {
       'SELECT id, schema_name, created_at, updated_at FROM M_Forms WHERE schema_name = ? LIMIT 1',
       [name]
     );
-    const formRow = (formRows as any[])[0];
+    const formRow = (formRows as RowDataPacket[])[0];
 
     if (!formRow) {
       return NextResponse.json({ error: 'Schema not found' }, { status: 404 });
@@ -30,7 +35,7 @@ export async function GET(req: NextRequest) {
       'SELECT id, label, order_index FROM M_FormSteps WHERE form_id = ? ORDER BY order_index ASC',
       [formId]
     );
-    const steps = (stepRows as any[]).map(r => ({
+    const steps = (stepRows as RowDataPacket[]).map(r => ({
       id: r.id.startsWith(name + '_') ? r.id.substring(name.length + 1) : r.id,
       label: r.label,
       order: r.order_index
@@ -41,7 +46,7 @@ export async function GET(req: NextRequest) {
       'SELECT id, step_id, label, name, type, is_required, placeholder, options, order_index FROM M_FormFields WHERE form_id = ? ORDER BY order_index ASC',
       [formId]
     );
-    const fields = (fieldRows as any[]).map(r => ({
+    const fields = (fieldRows as RowDataPacket[]).map(r => ({
       id: r.id.startsWith(name + '_') ? r.id.substring(name.length + 1) : r.id,
       stepId: r.step_id.startsWith(name + '_') ? r.step_id.substring(name.length + 1) : r.step_id,
       label: r.label,
@@ -71,7 +76,7 @@ export async function GET(req: NextRequest) {
 }
 
 // Helper to diff and UPSERT steps and fields
-async function syncFormSchema(connection: any, formId: number, formName: string, steps: any[], fields: any[]) {
+async function syncFormSchema(connection: PoolConnection, formId: number, formName: string, steps: FormStep[], fields: FormField[]) {
   const validStepIds = new Set<string>();
   let stepOrder = 1;
 
@@ -88,7 +93,7 @@ async function syncFormSchema(connection: any, formId: number, formName: string,
   }
 
   // Delete purged steps
-  const [existingSteps] = await connection.execute('SELECT id FROM M_FormSteps WHERE form_id = ?', [formId]);
+  const [existingSteps] = await connection.execute<RowDataPacket[]>('SELECT id FROM M_FormSteps WHERE form_id = ?', [formId]);
   for (const row of existingSteps) {
     if (!validStepIds.has(row.id)) {
       await connection.execute('DELETE FROM M_FormSteps WHERE id = ?', [row.id]);
@@ -96,7 +101,7 @@ async function syncFormSchema(connection: any, formId: number, formName: string,
   }
 
   const validFieldIds = new Set<string>();
-  let fieldOrderMap: Record<string, number> = {};
+  const fieldOrderMap: Record<string, number> = {};
 
   for (const field of fields) {
     const globalStepId = `${formName}_${field.stepId}`;
@@ -124,7 +129,7 @@ async function syncFormSchema(connection: any, formId: number, formName: string,
   }
 
   // Delete purged fields
-  const [existingFields] = await connection.execute('SELECT id FROM M_FormFields WHERE form_id = ?', [formId]);
+  const [existingFields] = await connection.execute<RowDataPacket[]>('SELECT id FROM M_FormFields WHERE form_id = ?', [formId]);
   for (const row of existingFields) {
     if (!validFieldIds.has(row.id)) {
       await connection.execute('DELETE FROM M_FormFields WHERE id = ?', [row.id]);
@@ -148,15 +153,15 @@ export async function POST(req: NextRequest) {
       'INSERT INTO M_Forms (schema_name) VALUES (?)',
       [schema_name]
     );
-    const formId = (result as any).insertId;
+    const formId = (result as ResultSetHeader).insertId;
 
     await syncFormSchema(connection, formId, schema_name, steps, fields);
 
     await connection.commit();
     return NextResponse.json({ success: true, insertId: formId }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     await connection.rollback();
-    if (error?.code === 'ER_DUP_ENTRY') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ER_DUP_ENTRY') {
       return NextResponse.json({ error: 'A schema with that name already exists.' }, { status: 409 });
     }
     console.error('[form-schema POST]', error);
@@ -179,7 +184,7 @@ export async function PUT(req: NextRequest) {
     await connection.beginTransaction();
 
     const [formRows] = await connection.execute('SELECT schema_name FROM M_Forms WHERE id = ? FOR UPDATE', [id]);
-    const formRow = (formRows as any[])[0];
+    const formRow = (formRows as RowDataPacket[])[0];
     if (!formRow) {
       await connection.rollback();
       return NextResponse.json({ error: 'Form not found.' }, { status: 404 });

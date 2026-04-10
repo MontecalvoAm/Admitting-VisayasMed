@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
-import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { ResultSetHeader } from 'mysql2';
 import { recordAuditLog } from '@/lib/auditLogger';
 import { getSession } from '@/lib/session';
 import { AdmitSchema } from '@/lib/schemas';

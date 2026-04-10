@@ -16,7 +16,8 @@ export async function POST(req: NextRequest) {
     const rawData = await req.json();
     const parsed = AdmitSchema.safeParse(rawData);
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Validation Error', details: parsed.error.format() }, { status: 400 });
+      const firstError = parsed.error.issues[0]?.message || 'Validation Error';
+      return NextResponse.json({ error: firstError, details: parsed.error.format() }, { status: 400 });
     }
     const data = parsed.data;
 
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
           EmergencyContactName, EmergencyRelation, EmergencyContactNumber,
           ResponsibleName, ResponsibleContact, ResponsibleAddress, ResponsibleRelation,
           CreatedBy
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           data.LastName || null, data.GivenName || null, data.MiddleName || null, data.Suffix || null, data.Birthday || null, data.BirthPlace || null, data.Sex || null, 
           data.ContactNumber || null, data.CityAddress || null, data.ProvincialAddress || null, data.CivilStatus || null, data.Religion || null, data.Citizenship || null, data.Occupation || null,

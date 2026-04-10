@@ -1,19 +1,29 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Clock, Calendar, Stethoscope, Activity, MapPin, User, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronRight, Clock, Calendar, Stethoscope, Activity } from 'lucide-react';
 import PatientActions from './PatientActions';
 import { useRouter } from 'next/navigation';
 
+import { AdmitData } from '@/lib/schemas';
+
+type DetailedPatient = AdmitData & { 
+  Id: number; 
+  CreatedAt: string; 
+  AdmissionCount?: number; 
+  CurrentAdmissionID?: number; 
+  IsViewed?: boolean;
+};
+
 interface PatientRowProps {
-  patient: any;
+  patient: DetailedPatient;
   index: number;
 }
 
 const PatientRow: React.FC<PatientRowProps> = ({ patient, index }) => {
   const router = useRouter();
   const [isExpanded, setIsExpanded] = useState(false);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<DetailedPatient[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   
   const hasHistory = (patient.AdmissionCount || 0) > 1;
@@ -30,7 +40,7 @@ const PatientRow: React.FC<PatientRowProps> = ({ patient, index }) => {
         if (res.ok) {
           const data = await res.json();
           // Filter out the current (latest) admission from history to avoid duplication
-          setHistory(data.filter((h: any) => Number(h.Id) !== Number(patient.CurrentAdmissionID)));
+          setHistory(data.filter((h: DetailedPatient) => Number(h.Id) !== Number(patient.CurrentAdmissionID)));
         }
       } catch (error) {
         console.error('Error fetching history:', error);
@@ -70,7 +80,7 @@ const PatientRow: React.FC<PatientRowProps> = ({ patient, index }) => {
                 )}
               </div>
               <div className="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">
-                {patient.CityAddress?.substring(0, 40)}{patient.CityAddress?.length > 40 ? '...' : ''}
+                {patient.CityAddress ? (patient.CityAddress.substring(0, 40) + (patient.CityAddress.length > 40 ? '...' : '')) : ''}
               </div>
             </div>
           </div>
@@ -126,10 +136,10 @@ const PatientRow: React.FC<PatientRowProps> = ({ patient, index }) => {
                 </div>
               ) : (
                 <div className="grid gap-4">
-                  {history.map((record, index) => (
+                  {history.map((record) => (
                     <div 
                       key={record.Id} 
-                      className="group relative bg-white border border-slate-200/60 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-vmed-blue-light/30 transition-all duration-300"
+                      className="group relative bg-white border border-slate-200/60 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-vmed-blue-light/30 transition-all duration-300"
                     >
                        {/* Timeline Marker (Circle on the line) */}
                        <div className="absolute -left-[29px] top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-vmed-blue-light shadow-sm z-10 group-hover:scale-110 transition-transform" />

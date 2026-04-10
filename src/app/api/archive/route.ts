@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       const totalItems = countRows[0].count;
 
       const [rows] = await pool.query<RowDataPacket[]>(
-        'SELECT UserID, FirstName, LastName, Email, RoleID, DeletedAt FROM M_Users WHERE IsDeleted = true ORDER BY DeletedAt DESC LIMIT ? OFFSET ?',
+        'SELECT UserID, FirstName, LastName, Email, RoleID, DeletedAt, DeletedBy FROM M_Users WHERE IsDeleted = true ORDER BY DeletedAt DESC LIMIT ? OFFSET ?',
         [limit, offset]
       );
       
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       const totalItems = countRows[0].count;
 
       const [rows] = await pool.query<RowDataPacket[]>(
-        'SELECT PatientID as Id, LastName, GivenName, MiddleName, Birthday, DeletedAt FROM M_Patients WHERE IsDeleted = true ORDER BY DeletedAt DESC LIMIT ? OFFSET ?',
+        'SELECT PatientID as Id, LastName, GivenName, MiddleName, Birthday, DeletedAt, DeletedBy FROM M_Patients WHERE IsDeleted = true ORDER BY DeletedAt DESC LIMIT ? OFFSET ?',
         [limit, offset]
       );
 

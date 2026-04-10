@@ -4,11 +4,18 @@ import React, { useState, useEffect } from 'react';
 import { User, Mail, Shield, Lock, Loader2, Info } from 'lucide-react';
 import { InputField, SelectField } from './InputField';
 
+import { UserData } from '@/lib/schemas';
+
 interface UserFormProps {
-  formData: any;
+  formData: Partial<UserData & { UserID?: number }>;
   onChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   isEdit?: boolean;
   isReadOnly?: boolean;
+}
+
+interface Role {
+  RoleID: number;
+  RoleName: string;
 }
 
 const UserForm: React.FC<UserFormProps> = ({ 
@@ -17,11 +24,12 @@ const UserForm: React.FC<UserFormProps> = ({
   isEdit = false, 
   isReadOnly = false 
 }) => {
-  const [roles, setRoles] = useState<any[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
 
   useEffect(() => {
     fetchRoles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchRoles = async () => {
@@ -33,9 +41,9 @@ const UserForm: React.FC<UserFormProps> = ({
         setRoles(data.roles || []);
         
         // If it's a new user and no role is selected, select the first role as default or staff
-        if (!isEdit && !formData.RoleID && data.length > 0) {
-          const staffRole = data.find((r: any) => r.RoleName === 'Staff');
-          const defaultRoleID = staffRole ? staffRole.RoleID : data[0].RoleID;
+        if (!isEdit && !formData.RoleID && data.roles && data.roles.length > 0) {
+          const staffRole = data.roles.find((r: Role) => r.RoleName === 'Staff');
+          const defaultRoleID = staffRole ? staffRole.RoleID : data.roles[0].RoleID;
           
           // Manually trigger an onChange to set the default RoleID
           const event = {
@@ -107,16 +115,17 @@ const UserForm: React.FC<UserFormProps> = ({
         className="bg-white"
       />
 
-      {!isEdit && !isReadOnly && (
+      {!isReadOnly && (
         <InputField 
           label="Password" 
           name="Password" 
           type="password" 
           value={formData.Password || ''} 
           onChange={onChange} 
-          required 
+          required={!isEdit} 
           icon={Lock}
           className="bg-white"
+          placeholder={isEdit ? "Leave blank to keep unchanged" : ""}
         />
       )}
 

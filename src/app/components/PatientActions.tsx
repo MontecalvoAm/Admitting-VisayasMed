@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Printer, Eye, Edit, Trash2, AlertTriangle, Loader2, Clock, ShieldAlert } from 'lucide-react';
+import { Printer, Eye, Edit, Trash2, Loader2, Clock, ShieldAlert } from 'lucide-react';
 import Modal from './Modal';
 import PatientForm from './PatientForm';
 import PrintableForm from './PrintableForm';
@@ -9,8 +9,17 @@ import { useRouter } from 'next/navigation';
 import AuditTrail from './AuditTrail';
 import { useStatusModal } from './StatusModalContext';
 
+import { AdmitData } from '@/lib/schemas';
+
+interface PatientPermissions {
+  CanView: boolean;
+  CanAdd: boolean;
+  CanEdit: boolean;
+  CanDelete: boolean;
+}
+
 interface PatientActionsProps {
-  patient: any;
+  patient: AdmitData & { Id: number; CreatedAt?: string; CurrentAdmissionID?: number };
   isAdmission?: boolean;
   onSuccess?: () => void;
   onInteraction?: () => void;
@@ -19,12 +28,10 @@ interface PatientActionsProps {
 const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = false, onSuccess, onInteraction }) => {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [editedPatient, setEditedPatient] = useState({ ...patient });
-  const [permissions, setPermissions] = useState<any>(null);
+  const [editedPatient, setEditedPatient] = useState<Partial<AdmitData & { Id: number; CreatedAt?: string; UpdatedAt?: string; CurrentAdmissionID?: number }>>({ ...patient });
+  const [permissions, setPermissions] = useState<PatientPermissions | null>(null);
   const [isLoadingPerms, setIsLoadingPerms] = useState(true);
   const { showSuccess, showError, showConfirm, setLoading, hideModal } = useStatusModal();
   const router = useRouter();
@@ -39,7 +46,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
       const res = await fetch('/api/rbac/permissions/me');
       if (res.ok) {
         const data = await res.json();
-        const mod = data.find((p: any) => p.ModuleName === 'Patients');
+        const mod = data.find((p: { ModuleName: string }) => p.ModuleName === 'Patients');
         setPermissions(mod || { CanView: true, CanAdd: false, CanEdit: false, CanDelete: false });
       }
     } catch (err) {
@@ -56,6 +63,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
 
   const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setEditedPatient((prev: any) => ({ ...prev, [name]: value }));
   };
 
@@ -95,6 +103,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
       async () => {
         setLoading(true);
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { Id, CreatedAt, UpdatedAt, ...newData } = editedPatient;
           const reAdmitData = {
             ...newData,
@@ -129,7 +138,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
       'Confirm Re-Admit'
     );
   };
- circular_dependency_warning: false
+
 
   const markAsViewed = async () => {
     try {
@@ -160,7 +169,6 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
             method: 'DELETE',
           });
           if (res.ok) {
-            setIsDeleteOpen(false);
             if (onSuccess) onSuccess();
             router.refresh();
             hideModal();

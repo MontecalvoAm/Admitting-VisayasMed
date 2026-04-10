@@ -49,7 +49,8 @@ export async function PUT(
 
     const parsed = AdmitSchema.safeParse(rawData);
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Validation Error', details: parsed.error.format() }, { status: 400 });
+      const firstError = parsed.error.issues[0]?.message || 'Validation Error';
+      return NextResponse.json({ error: firstError, details: parsed.error.format() }, { status: 400 });
     }
     const data = parsed.data;
 
@@ -137,16 +138,18 @@ export async function DELETE(
     );
     const patientName = patientRows.length > 0 ? `${patientRows[0].LastName}, ${patientRows[0].GivenName}` : 'Unknown';
 
+    const deletedBy = `${session.firstName} ${session.lastName}`;
+
     // Soft delete patient
     const [result] = await pool.execute<ResultSetHeader>(
-      'UPDATE M_Patients SET IsDeleted = true WHERE PatientID = ?',
-      [id]
+      'UPDATE M_Patients SET IsDeleted = true, DeletedAt = CURRENT_TIMESTAMP, DeletedBy = ? WHERE PatientID = ?',
+      [deletedBy, id]
     );
 
     // Soft delete admissions
     await pool.execute(
-      'UPDATE M_Admissions SET IsDeleted = true WHERE PatientID = ?',
-      [id]
+      'UPDATE M_Admissions SET IsDeleted = true, DeletedAt = CURRENT_TIMESTAMP, DeletedBy = ? WHERE PatientID = ?',
+      [deletedBy, id]
     );
 
     if (result.affectedRows === 0) {

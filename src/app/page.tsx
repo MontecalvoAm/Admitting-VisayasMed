@@ -5,23 +5,20 @@ import {
   User,
   Users,
   Phone,
-  CheckCircle2,
   AlertCircle,
   ChevronRight,
   ChevronLeft,
   Eye,
   Loader2,
   ClipboardCheck,
-  X,
   Layout,
 } from "lucide-react";
 import StepIndicator from "./components/StepIndicator";
 import FormStep from "./components/FormStep";
 import { InputField, SelectField, CheckboxField } from "./components/InputField";
 import PrintableForm from "./components/PrintableForm";
-import Modal from "./components/Modal";
 import { useStatusModal } from "./components/StatusModalContext";
- circular_dependency_warning: false
+// Patient Admission Form Component
 
 /* ─── Schema Types (mirrors /api/form-schema) ─── */
 interface FieldOption {
@@ -88,8 +85,7 @@ export default function AdmittingForm() {
   const [formData, setFormData] = useState<FormData>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
-  const [errorMessage, setErrorMessage] = useState("");
-  const { showSuccess, showError, setLoading: setGlobalLoading } = useStatusModal();
+  const { showSuccess, showError } = useStatusModal();
 
   /* ─── Fetch schema on mount ─── */
   useEffect(() => {
@@ -190,7 +186,7 @@ export default function AdmittingForm() {
     setStatus("idle");
     setCurrentStepIndex((prev) => Math.min(prev + 1, totalSteps - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [validateCurrentStep, totalSteps]);
+  }, [validateCurrentStep, totalSteps, showError]);
 
   const handleBack = useCallback(() => {
     setCurrentStepIndex((prev) => Math.max(prev - 1, 0));
@@ -247,10 +243,11 @@ export default function AdmittingForm() {
       setCurrentStepIndex(0);
       setErrors({});
       setStatus("idle");
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
+      const msg = err instanceof Error ? err.message : "Submission Failed";
       setStatus("error");
-      showError("Submission Failed", "Something went wrong while submitting the form. Please try again or contact support.");
+      showError("Submission Failed", msg);
     }
   };
 
@@ -318,7 +315,7 @@ export default function AdmittingForm() {
               <p className="text-sm font-medium text-slate-500 m-0 mt-1">Please carefully review all details below before finalizing the admission.</p>
             </div>
           </div>
-          <PrintableForm formData={formData as any} />
+          <PrintableForm formData={formData as Record<string, unknown>} />
         </div>
       );
     }
@@ -351,7 +348,7 @@ export default function AdmittingForm() {
       };
 
       stepFields.forEach((field, idx) => {
-        if (field.type === ("section" as any)) {
+        if (field.type === "text" as string && field.name === "section_header") { // special handling for section headers if they ever exist as mock types
           // Flush existing group
           flushGroup(idx);
           // Add section header

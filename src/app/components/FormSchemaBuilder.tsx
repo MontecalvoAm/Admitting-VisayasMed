@@ -4,7 +4,7 @@ import React, { useState, useCallback } from 'react';
 import {
   X, Plus, Trash2, GripVertical, ChevronDown, ChevronUp,
   Save, Settings, Type, Hash, Calendar, Phone, Mail, List,
-  CheckSquare, AlertCircle, CheckCircle2, Loader2, Edit2, Check
+  CheckSquare, Loader2, Edit2, Check
 } from 'lucide-react';
 import { useStatusModal } from './StatusModalContext';
 
@@ -45,7 +45,7 @@ interface Props {
 }
 
 /* ─── Constants ─── */
-const FIELD_TYPES: { value: FormField['type']; label: string; icon: any }[] = [
+const FIELD_TYPES: { value: FormField['type']; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: 'text', label: 'Text', icon: Type },
   { value: 'number', label: 'Number', icon: Hash },
   { value: 'date', label: 'Date', icon: Calendar },
@@ -226,7 +226,7 @@ function FieldEditor({ field, steps, onChange, onDelete }: FieldEditorProps) {
                 </button>
               </div>
               {field.options.length === 0 && (
-                <p className="text-xs text-slate-400 italic">No options yet. Click "Add Option".</p>
+                <p className="text-xs text-slate-400 italic">No options yet. Click &quot;Add Option&quot;.</p>
               )}
               {field.options.map((opt, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -260,7 +260,7 @@ export default function FormSchemaBuilder({ schemaName, onClose, onSaved }: Prop
   const [schema, setSchema] = useState<FormSchema | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { showSuccess, showError, showConfirm, hideModal, setLoading: setGlobalLoading } = useStatusModal();
+  const { showSuccess, showError, showConfirm } = useStatusModal();
   const [activeStepId, setActiveStepId] = useState<string | null>(null);
   const [editingStepId, setEditingStepId] = useState<string | null>(null);
   const [editingStepLabel, setEditingStepLabel] = useState('');
@@ -407,8 +407,9 @@ export default function FormSchemaBuilder({ schemaName, onClose, onSaved }: Prop
 
           showSuccess('Schema Saved', `The form structure for "${schema.schema_name}" has been successfully saved and activated.`);
           onSaved?.(schema);
-        } catch (err: any) {
-          showError('Save Failed', err.message || 'Failed to save form schema.');
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'Failed to save form schema.';
+          showError('Save Failed', msg);
         } finally {
           setSaving(false);
         }
@@ -560,7 +561,7 @@ export default function FormSchemaBuilder({ schemaName, onClose, onSaved }: Prop
                   <div className="text-center py-16 text-slate-400">
                     <List className="w-10 h-10 mx-auto mb-3 opacity-30" />
                     <p className="text-sm font-semibold">No fields yet</p>
-                    <p className="text-xs mt-1">Click "Add Field" to create input fields for this step.</p>
+                    <p className="text-xs mt-1">Click &quot;Add Field&quot; to create input fields for this step.</p>
                   </div>
                 ) : (
                   activeStepFields.map((field, idx) => (

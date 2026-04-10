@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Shield, Plus, Key, Edit, Trash2, Loader2, Search, Mail, Filter, AlertTriangle, Save, X, ShieldAlert, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Shield, Plus, Key, Edit, Trash2, Loader2, AlertTriangle, Save, ShieldAlert, AlertCircle } from 'lucide-react';
 import PermissionModal from './PermissionModal';
 import Modal from './Modal';
 import PaginationWrapper from './PaginationWrapper';
@@ -18,6 +18,13 @@ interface RolesRegistryProps {
   itemsPerPage?: number;
 }
 
+interface RolePermissions {
+  CanView: boolean;
+  CanAdd: boolean;
+  CanEdit: boolean;
+  CanDelete: boolean;
+}
+
 const RolesRegistry: React.FC<RolesRegistryProps> = ({
   currentPage = 1,
   itemsPerPage = 5,
@@ -31,25 +38,19 @@ const RolesRegistry: React.FC<RolesRegistryProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   
   // RBAC State
-  const [myPermissions, setMyPermissions] = useState<any>(null);
+  const [myPermissions, setMyPermissions] = useState<RolePermissions | null>(null);
   const [isPermsLoading, setIsPermsLoading] = useState(true);
 
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [formData, setFormData] = useState({ RoleName: '', Description: '' });
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchRoles();
-    fetchMyPermissions();
-  }, [currentPage, itemsPerPage]);
-
-  const fetchMyPermissions = async () => {
+  const fetchMyPermissions = useCallback(async () => {
     try {
       const res = await fetch('/api/rbac/permissions/me');
       if (res.ok) {
         const data = await res.json();
-        // Look for 'Roles' module permissions
-        const mod = data.find((p: any) => p.ModuleName === 'Roles');
+        const mod = data.find((p: { ModuleName: string }) => p.ModuleName === 'Roles');
         setMyPermissions(mod || { CanView: true, CanAdd: false, CanEdit: false, CanDelete: false });
       }
     } catch (error) {
@@ -57,9 +58,9 @@ const RolesRegistry: React.FC<RolesRegistryProps> = ({
     } finally {
       setIsPermsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     setIsLoading(true);
     try {
       const offset = (currentPage - 1) * itemsPerPage;
@@ -72,7 +73,12 @@ const RolesRegistry: React.FC<RolesRegistryProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    fetchRoles();
+    fetchMyPermissions();
+  }, [currentPage, itemsPerPage, fetchRoles, fetchMyPermissions]);
 
   const handleOpenAdd = () => {
     if (!myPermissions?.CanAdd) return;

@@ -24,7 +24,7 @@ export default function LoginPage() {
       } else {
         alert(data.error || "Login failed");
       }
-    } catch (err) {
+    } catch {
       alert("An error occurred during login.");
     }
   };

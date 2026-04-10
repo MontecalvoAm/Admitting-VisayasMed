@@ -10,15 +10,18 @@ export default async function proxy(req: NextRequest) {
   const isAuthRoute = path.startsWith('/api/auth');
   const isProtectedApiRoute = path.startsWith('/api') && !isAuthRoute;
 
+  let response = NextResponse.next();
+
   if (isProtectedRoute || isProtectedApiRoute) {
     const cookie = req.cookies.get("session")?.value;
     const session = await decrypt(cookie);
 
     if (!session?.userId) {
       if (isProtectedApiRoute) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        response = NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      } else {
+        response = NextResponse.redirect(new URL("/login", req.nextUrl));
       }
-      return NextResponse.redirect(new URL("/login", req.nextUrl));
     }
   }
 
@@ -26,11 +29,17 @@ export default async function proxy(req: NextRequest) {
     const cookie = req.cookies.get("session")?.value;
     const session = await decrypt(cookie);
     if (session?.userId) {
-      return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+      response = NextResponse.redirect(new URL("/dashboard", req.nextUrl));
     }
   }
 
-  return NextResponse.next();
+  if (path.startsWith('/dashboard') || path === '/login') {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+  }
+
+  return response;
 }
 
 export const config = {

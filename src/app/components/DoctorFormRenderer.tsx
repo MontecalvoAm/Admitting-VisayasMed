@@ -6,7 +6,7 @@ import {
   Loader2, FileText, Eye
 } from 'lucide-react';
 import StepIndicator from './StepIndicator';
-import type { FormSchema, FormField, FormStep } from './FormSchemaBuilder';
+import type { FormSchema, FormField } from './FormSchemaBuilder';
 import { useStatusModal } from './StatusModalContext';
 
 interface Props {
@@ -113,7 +113,7 @@ export default function DoctorFormRenderer({ schemaName, onClose }: Props) {
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [status, setStatus] = useState<'idle' | 'submitting' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const { showSuccess, showError, setLoading: setGlobalLoading } = useStatusModal();
+  const { showSuccess, showError } = useStatusModal();
 
   /* ─── Load schema ─── */
   useEffect(() => {
@@ -198,13 +198,14 @@ export default function DoctorFormRenderer({ schemaName, onClose }: Props) {
       
       onClose();
       showSuccess('Submission Successful', 'Your registration information has been recorded in our system. Thank you!');
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatus('error');
-      setErrorMessage(err.message || 'Something went wrong. Please try again.');
+      const msg = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
+      setErrorMessage(msg);
       showError('Submission Error', 'We encountered an error while submitting your form. Please check your connection and try again.');
     }
   };
- circular_dependency_warning: false
+
 
   /* ─── Step definitions for indicator ─── */
   const stepIndicatorSteps = schema

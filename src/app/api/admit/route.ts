@@ -3,8 +3,7 @@ import pool from '@/lib/db';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { getSession } from '@/lib/session';
 import { AdmitSchema } from '@/lib/schemas';
-import { z } from 'zod';
-import { hasPermission } from '@/lib/rbac';
+
 
 export async function POST(req: NextRequest) {
   try {

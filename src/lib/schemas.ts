@@ -5,7 +5,7 @@ export const AdmitSchema = z.object({
   GivenName: z.string().min(1, "Given name is required").max(100),
   MiddleName: z.string().max(100).optional().nullable(),
   Suffix: z.string().max(20).optional().nullable(),
-  Birthday: z.string().refine((date) => !isNaN(Date.parse(date)), { message: "Invalid date format" }).optional().nullable(),
+  Birthday: z.string().refine((date) => !date || !isNaN(Date.parse(date)), { message: "Invalid date format" }).optional().nullable(),
   BirthPlace: z.string().max(200).optional().nullable(),
   Sex: z.enum(["Male", "Female", "Other", ""]).optional().nullable(),
   ContactNumber: z.string().max(50).optional().nullable(),
@@ -40,13 +40,13 @@ export const AdmitSchema = z.object({
   ResponsibleAddress: z.string().max(255).optional().nullable(),
   ResponsibleRelation: z.string().max(100).optional().nullable(),
 
-  Age: z.number().int().min(0).max(150).optional().nullable(),
+  Age: z.coerce.number().int().min(0).max(150).optional().nullable(),
   AttendingPhysician: z.string().max(200).optional().nullable(),
-  PreviouslyAdmitted: z.boolean().optional(),
+  PreviouslyAdmitted: z.coerce.boolean().optional().nullable(),
   PreviousAdmissionDate: z.string().refine((date) => !date || !isNaN(Date.parse(date)), { message: "Invalid date format" }).optional().nullable(),
   PhilHealthStatus: z.string().max(50).optional().nullable(),
-  HmoCompany: z.boolean().optional().nullable(),
-  VmcBenefit: z.boolean().optional().nullable(),
+  HmoCompany: z.coerce.boolean().optional().nullable(),
+  VmcBenefit: z.string().max(100).optional().nullable(),
   ServiceCaseType: z.string().max(200).optional().nullable(),
   
   PrintedNameSignature: z.string().max(200).optional().nullable(),
@@ -65,5 +65,9 @@ export const UserSchema = z.object({
 export const PatientSchema = z.object({
   LastName: z.string().min(1, "Last name is required").max(100),
   GivenName: z.string().min(1, "Given name is required").max(100),
-  Birthday: z.string().refine((date) => !isNaN(Date.parse(date)), { message: "Invalid date format" }).optional().nullable(),
+  Birthday: z.string().refine((date) => !date || !isNaN(Date.parse(date)), { message: "Invalid date format" }).optional().nullable(),
 });
+
+export type AdmitData = z.infer<typeof AdmitSchema>;
+export type UserData = z.infer<typeof UserSchema>;
+export type PatientData = z.infer<typeof PatientSchema>;

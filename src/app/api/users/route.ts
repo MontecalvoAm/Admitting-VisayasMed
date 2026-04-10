@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import bcrypt from 'bcryptjs';
-import { ResultSetHeader } from 'mysql2';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { getSession } from '@/lib/session';
 import { UserSchema } from '@/lib/schemas';
 
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
     // Check if email already exists
     const [existing] = await pool.query('SELECT Email FROM M_Users WHERE Email = ?', [data.Email]);
-    if ((existing as any[]).length > 0) {
+    if ((existing as RowDataPacket[]).length > 0) {
       return NextResponse.json({ error: 'Email already exists.' }, { status: 400 });
     }
 

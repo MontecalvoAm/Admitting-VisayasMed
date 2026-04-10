@@ -5,7 +5,7 @@ import { Clock, User, ShieldCheck, Loader2 } from 'lucide-react';
 
 interface AuditTrailProps {
   resource: string;
-  id: string | number;
+  id?: string | number;
 }
 
 interface AuditLog {
