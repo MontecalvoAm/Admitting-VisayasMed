@@ -1,20 +1,37 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Search, 
   RefreshCw, 
   Trash2, 
   User, 
   Users as PatientsIcon,
-  AlertTriangle,
   Loader2,
-  MoreVertical,
   Calendar,
   Mail,
-  ShieldAlert,
-  ArrowRight
+  ShieldAlert
 } from 'lucide-react';
+
+interface ArchivedUser {
+  UserID: number;
+  FirstName: string;
+  LastName: string;
+  Email: string;
+  DeletedAt: string;
+  DeletedBy?: string;
+}
+
+interface ArchivedPatient {
+  Id: number;
+  GivenName: string;
+  LastName: string;
+  Birthday: string;
+  DeletedAt: string;
+  DeletedBy?: string;
+}
+
+type ArchivedItem = ArchivedUser & ArchivedPatient; // Intersection because we access properties dynamically based on tab
 import Pagination from './Pagination';
 import { useStatusModal } from './StatusModalContext';
 
@@ -24,10 +41,9 @@ interface ArchiveRegistryProps {
 
 const ArchiveRegistry: React.FC<ArchiveRegistryProps> = ({ initialType }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'patients'>(initialType);
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<ArchivedItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
 
   const { showSuccess, showError, showConfirm, setLoading, hideModal } = useStatusModal();
 
@@ -37,7 +53,7 @@ const ArchiveRegistry: React.FC<ArchiveRegistryProps> = ({ initialType }) => {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
 
-  const fetchData = async (type: 'users' | 'patients', page: number, limit: number) => {
+  const fetchData = useCallback(async (type: 'users' | 'patients', page: number, limit: number) => {
     setIsLoading(true);
     try {
       const res = await fetch(`/api/archive?type=${type}&page=${page}&limit=${limit}`);
@@ -55,11 +71,11 @@ const ArchiveRegistry: React.FC<ArchiveRegistryProps> = ({ initialType }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showError]);
 
   useEffect(() => {
     fetchData(activeTab, currentPage, itemsPerPage);
-  }, [activeTab, currentPage, itemsPerPage]);
+  }, [activeTab, currentPage, itemsPerPage, fetchData]);
 
   const handleRestore = async (id: string | number, name: string) => {
     setLoading(true);
@@ -77,10 +93,11 @@ const ArchiveRegistry: React.FC<ArchiveRegistryProps> = ({ initialType }) => {
           showSuccess('Record Restored', `${activeTab === 'users' ? 'User' : 'Patient'} "${name}" has been successfully restored to the active registry.`);
         }, 300);
       } else {
-        const error = await res.json();
-        showError('Restoration Failed', error.error || 'Failed to restore record');
+        const errorData = await res.json();
+        showError('Restoration Failed', errorData.error || 'Failed to restore record');
       }
     } catch (error) {
+      console.error('Error restoring record:', error);
       showError('Network Error', 'A connection error occurred while trying to restore the record.');
     } finally {
       setLoading(false);
@@ -103,10 +120,11 @@ const ArchiveRegistry: React.FC<ArchiveRegistryProps> = ({ initialType }) => {
           showSuccess('Record Purged', `The ${activeTab === 'users' ? 'User' : 'Patient'} "${name}" has been permanently removed from the system.`);
         }, 300);
       } else {
-        const error = await res.json();
-        showError('Action Failed', error.error || 'Failed to delete record');
+        const errorData = await res.json();
+        showError('Action Failed', errorData.error || 'Failed to delete record');
       }
     } catch (error) {
+      console.error('Error purging record:', error);
       showError('Network Error', 'A connection error occurred while trying to purge the record.');
     } finally {
       setLoading(false);
@@ -192,13 +210,14 @@ const ArchiveRegistry: React.FC<ArchiveRegistryProps> = ({ initialType }) => {
               <tr className="border-b border-slate-100 bg-slate-50/50">
                 <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-wider">{activeTab === 'users' ? 'User Info' : 'Patient Name'}</th>
                 <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-wider">Deleted Date</th>
+                <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-wider">Deleted By</th>
                 <th className="px-6 py-4 text-[11px] font-black text-slate-500 uppercase tracking-wider text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={3} className="px-6 py-12 text-center">
+                  <td colSpan={4} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
                       <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Loading archive data...</p>
@@ -207,7 +226,7 @@ const ArchiveRegistry: React.FC<ArchiveRegistryProps> = ({ initialType }) => {
                 </tr>
               ) : filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-6 py-12 text-center text-slate-500 font-medium italic">
+                  <td colSpan={4} className="px-6 py-12 text-center text-slate-500 font-medium italic">
                     <div className="flex flex-col items-center gap-2 opacity-40">
                       <ShieldAlert className="w-12 h-12 mb-2" />
                       <p>No deleted records found in this category.</p>
@@ -248,6 +267,11 @@ const ArchiveRegistry: React.FC<ArchiveRegistryProps> = ({ initialType }) => {
                               {new Date(item.DeletedAt).toLocaleDateString()} at {new Date(item.DeletedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </>
                           ) : 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-bold text-slate-700">
+                          {item.DeletedBy || 'System'}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">

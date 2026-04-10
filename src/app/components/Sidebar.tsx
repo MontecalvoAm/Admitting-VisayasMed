@@ -9,7 +9,6 @@ import {
   Settings,
   Menu,
   ClipboardList,
-  Shield,
   Loader2,
   Database,
   Archive
@@ -24,7 +23,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ userName, email, userId, roleId }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [permissions, setPermissions] = useState<any[]>([]);
+  const [permissions, setPermissions] = useState<{ ModuleName: string; CanView: boolean }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
 
@@ -74,6 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({ userName, email, userId, roleId }) =>
         {!isCollapsed && (
           <div className="flex items-center gap-3 overflow-hidden animate-in fade-in slide-in-from-left-2 duration-300">
             <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/Visayas%20Medical.png" alt="Logo" className="w-full h-full object-contain" />
             </div>
             <div className="whitespace-nowrap">

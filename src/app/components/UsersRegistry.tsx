@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { UserPlus, Settings, Mail, Shield, CheckCircle, XCircle, Key, Edit, Trash2, Loader2, AlertTriangle, Search, Filter, X, RefreshCcw, Eye } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { UserPlus, Mail, Shield, CheckCircle, XCircle, Key, Edit, Trash2, Loader2, Search, Filter, X, RefreshCcw, Eye } from 'lucide-react';
 import Modal from './Modal';
 import UserForm from './UserForm';
 import PaginationWrapper from './PaginationWrapper';
@@ -10,12 +10,33 @@ import PermissionModal from './PermissionModal';
 import AuditTrail from './AuditTrail';
 import { useStatusModal } from './StatusModalContext';
 
+import { UserData } from '@/lib/schemas';
+
+interface UserRecord extends UserData {
+  UserID: number;
+  RoleName: string;
+  IsDeleted: boolean;
+  CreatedAt: string;
+}
+
+interface UserPermissions {
+  CanView: boolean;
+  CanAdd: boolean;
+  CanEdit: boolean;
+  CanDelete: boolean;
+}
+
 interface UsersRegistryProps {
-  users: any[];
+  users: UserRecord[];
   totalItems: number;
   currentPage: number;
   totalPages: number;
   itemsPerPage: number;
+}
+
+interface Role {
+  RoleID: number;
+  RoleName: string;
 }
 
 const UsersRegistry: React.FC<UsersRegistryProps> = ({ 
@@ -31,46 +52,37 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [roleFilter, setRoleFilter] = useState(searchParams.get('role') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
-  const [roles, setRoles] = useState<any[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [formData, setFormData] = useState<any>({});
+  const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
+  const [formData, setFormData] = useState<Partial<UserRecord>>({});
   const { showSuccess, showError, showConfirm, setLoading, hideModal } = useStatusModal();
   
   // RBAC State
-  const [myPermissions, setMyPermissions] = useState<any>(null);
-  const [isPermsLoading, setIsPermsLoading] = useState(true);
+  const [myPermissions, setMyPermissions] = useState<UserPermissions | null>(null);
 
   const hasActiveFilters = searchTerm || roleFilter || statusFilter;
 
-  useEffect(() => {
-    fetchMyPermissions();
-    fetchRoles();
-  }, []);
-
-  const fetchMyPermissions = async () => {
+  const fetchMyPermissions = useCallback(async () => {
     try {
       const res = await fetch('/api/rbac/permissions/me');
       if (res.ok) {
         const data = await res.json();
-        const usersModule = data.find((p: any) => p.ModuleName === 'Users');
+        const usersModule = data.find((p: { ModuleName: string }) => p.ModuleName === 'Users');
         setMyPermissions(usersModule || { CanView: true, CanAdd: false, CanEdit: false, CanDelete: false });
       }
     } catch (error) {
       console.error('Error fetching my permissions:', error);
-    } finally {
-      setIsPermsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     try {
       const res = await fetch('/api/rbac/roles?limit=100');
       if (res.ok) {
@@ -80,7 +92,12 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
     } catch (error) {
       console.error('Error fetching roles:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchMyPermissions();
+    fetchRoles();
+  }, [fetchMyPermissions, fetchRoles]);
 
   // Synchronize state with URL
   useEffect(() => {
@@ -132,7 +149,7 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev: any) => ({ ...prev, [name]: value }));
+    setFormData((prev: Partial<UserRecord>) => ({ ...prev, [name]: value }));
   };
 
   const handleAddUser = async () => {
@@ -161,6 +178,7 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
   };
 
   const handleEditUser = async () => {
+    if (!selectedUser) return;
     setIsSaving(true);
     try {
       const res = await fetch(`/api/users/${selectedUser.UserID}`, {
@@ -217,7 +235,7 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
     );
   };
 
-  const openPermissionModal = (user: any) => {
+  const openPermissionModal = (user: UserRecord) => {
     setSelectedUser(user);
     setIsPermissionModalOpen(true);
   };
@@ -335,7 +353,7 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
                   </td>
                 </tr>
               ) : (
-                users.map((user: any) => (
+                users.map((user: UserRecord) => (
                   <tr key={user.UserID} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -393,7 +411,7 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
                           <button 
                             onClick={() => {
                               setSelectedUser(user);
-                              setFormData({ ...user });
+                              setFormData({ ...user, Password: '' });
                               setIsEditModalOpen(true);
                             }}
                             className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"

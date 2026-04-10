@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 // POST /api/form-schema/submit
 // Body: { schema_name: string, data: Record<string, any> }
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
       'SELECT id FROM form_schemas WHERE schema_name = ? LIMIT 1',
       [schema_name]
     );
-    const schema = (rows as any[])[0];
+    const schema = (rows as RowDataPacket[])[0];
     if (!schema) {
       return NextResponse.json({ error: 'Schema not found.' }, { status: 404 });
     }
@@ -39,8 +40,8 @@ export async function POST(req: NextRequest) {
       [schema.id, schema_name, JSON.stringify(data)]
     );
 
-    return NextResponse.json({ success: true, insertId: (result as any).insertId }, { status: 201 });
-  } catch (error) {
+    return NextResponse.json({ success: true, insertId: (result as ResultSetHeader).insertId }, { status: 201 });
+  } catch (error: unknown) {
     console.error('[form-schema/submit POST]', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }

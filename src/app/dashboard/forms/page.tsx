@@ -4,12 +4,11 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   Save, Plus, Trash2, GripVertical, ChevronDown, ChevronUp,
   Type, Hash, Calendar, Phone, Mail, List, CheckSquare,
-  AlertCircle, CheckCircle2, Loader2, Edit2, Check, X,
-  ClipboardList, Info, Printer, ShieldAlert
+  Loader2, Edit2, Check, X,
+  ClipboardList, Info, Printer, ShieldAlert, Layout
 } from 'lucide-react';
 import PrintableForm from '@/app/components/PrintableForm';
 import { useStatusModal } from '@/app/components/StatusModalContext';
- circular_dependency_warning: false
 
 /* ─── Types ─── */
 interface FormStep {
@@ -27,7 +26,7 @@ interface FormField {
   id: string;
   label: string;
   name: string;
-  type: 'text' | 'number' | 'date' | 'tel' | 'email' | 'select' | 'checkbox';
+  type: 'text' | 'number' | 'date' | 'tel' | 'email' | 'select' | 'checkbox' | 'section';
   stepId: string;
   required: boolean;
   placeholder: string;
@@ -44,7 +43,7 @@ interface FormSchema {
 const SCHEMA_NAME = 'patient-admission';
 
 /* ─── Constants ─── */
-const FIELD_TYPES: { value: FormField['type']; label: string; icon: any; color: string }[] = [
+const FIELD_TYPES: { value: FormField['type']; label: string; icon: React.ComponentType<{ className?: string }>; color: string }[] = [
   { value: 'text',     label: 'Text',     icon: Type,        color: 'bg-blue-50 text-blue-700 border-blue-200' },
   { value: 'number',   label: 'Number',   icon: Hash,        color: 'bg-purple-50 text-purple-700 border-purple-200' },
   { value: 'date',     label: 'Date',     icon: Calendar,    color: 'bg-amber-50 text-amber-700 border-amber-200' },
@@ -52,6 +51,7 @@ const FIELD_TYPES: { value: FormField['type']; label: string; icon: any; color: 
   { value: 'email',    label: 'Email',    icon: Mail,        color: 'bg-pink-50 text-pink-700 border-pink-200' },
   { value: 'select',   label: 'Dropdown', icon: List,        color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   { value: 'checkbox', label: 'Checkbox', icon: CheckSquare, color: 'bg-teal-50 text-teal-700 border-teal-200' },
+  { value: 'section',  label: 'Section Header', icon: Layout, color: 'bg-slate-900 text-white border-slate-800' },
 ];
 
 function nanoid() {
@@ -283,11 +283,11 @@ export default function ManageFormsPage() {
   const { showSuccess, showError, showConfirm, setLoading: setGlobalLoading } = useStatusModal();
   
   // RBAC State
-  const [permissions, setPermissions] = useState<any>(null);
+  const [permissions, setPermissions] = useState<{ CanView: boolean; CanAdd: boolean; CanEdit: boolean; CanDelete: boolean } | null>(null);
   const [isLoadingPerms, setIsLoadingPerms] = useState(true);
 
   /* ─── Empty form data for blank print ─── */
-  const EMPTY_FORM_DATA: Record<string, any> = {
+  const EMPTY_FORM_DATA: Record<string, unknown> = {
     isEmptyForm: true,
     LastName: '', GivenName: '', MiddleName: '', Suffix: '',
     Age: '', Birthday: '', BirthPlace: '', Sex: '',
@@ -310,7 +310,7 @@ export default function ManageFormsPage() {
       .then(res => res.json())
       .then(data => {
         if (!mounted) return;
-        const mod = data.find((p: any) => p.ModuleName === 'Forms');
+        const mod = data.find((p: { ModuleName: string }) => p.ModuleName === 'Forms');
         setPermissions(mod || { CanView: true, CanAdd: false, CanEdit: false, CanDelete: false });
         setIsLoadingPerms(false);
       });
@@ -476,8 +476,9 @@ export default function ManageFormsPage() {
           }
           
           showSuccess('Settings Saved', 'The Patient Admission form configuration has been successfully updated.');
-        } catch (err: any) {
-          showError('Save Failed', err.message || 'An unexpected error occurred while saving.');
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : 'An unexpected error occurred while saving.';
+          showError('Save Failed', msg);
         } finally {
           setSaving(false);
           setGlobalLoading(false);
@@ -659,7 +660,7 @@ export default function ManageFormsPage() {
                 <div className="glass-panel rounded-2xl flex flex-col items-center justify-center py-16 text-slate-400">
                   <List className="w-10 h-10 mb-3 opacity-30" />
                   <p className="text-sm font-semibold">No fields in this step</p>
-                  <p className="text-xs mt-1">Click "Add Field" to add input fields here.</p>
+                  <p className="text-xs mt-1">Click &quot;Add Field&quot; to add input fields here.</p>
                 </div>
               ) : (
                 activeStepFields.map((field, idx) => (

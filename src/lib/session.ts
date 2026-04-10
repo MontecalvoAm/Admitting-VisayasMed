@@ -1,11 +1,15 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 
-const secretKey = process.env.SESSION_SECRET;
-if (!secretKey) {
-  throw new Error("CRITICAL: SESSION_SECRET is not defined properly. System halting to prevent A02 Security Misconfiguration.");
+function getEncodedKey() {
+  const secretKey = process.env.SESSION_SECRET;
+  if (!secretKey) {
+    throw new Error(
+      "CRITICAL: SESSION_SECRET is not defined properly. System halting to prevent A02 Security Misconfiguration."
+    );
+  }
+  return new TextEncoder().encode(secretKey);
 }
-const encodedKey = new TextEncoder().encode(secretKey);
 
 export type SessionPayload = {
   userId: number;
@@ -21,16 +25,16 @@ export async function encrypt(payload: SessionPayload) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("8h")
-    .sign(encodedKey);
+    .sign(getEncodedKey());
 }
 
 export async function decrypt(session: string | undefined = "") {
   try {
-    const { payload } = await jwtVerify<SessionPayload>(session, encodedKey, {
+    const { payload } = await jwtVerify<SessionPayload>(session, getEncodedKey(), {
       algorithms: ["HS256"],
     });
     return payload;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

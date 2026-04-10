@@ -7,15 +7,24 @@ import {
   Users, 
   UserRound, 
   Calendar, 
-  TrendingUp, 
   Clock,
   ArrowRight,
   Plus,
   Download
 } from 'lucide-react';
 import Link from 'next/link';
-import PatientActions from '@/app/components/PatientActions';
 import DashboardClient from '@/app/components/DashboardClient';
+
+interface RecentAdmission {
+  Id: number;
+  PatientID: number;
+  LastName: string;
+  GivenName: string;
+  ServiceCaseType?: string;
+  Age?: number;
+  IsViewed?: boolean;
+  CreatedAt: string;
+}
 
 async function getStats() {
   // Total unique patients
@@ -93,7 +102,7 @@ export default async function DashboardPage() {
           <h2 className="text-2xl font-bold text-slate-800">
             Welcome back, <span className="text-vmed-blue-dark">{session.firstName}</span>!
           </h2>
-          <p className="text-sm text-slate-500 font-medium">Here's what's happening at Visayas Medical Center today.</p>
+          <p className="text-sm text-slate-500 font-medium">Here&apos;s what&apos;s happening at Visayas Medical Center today.</p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -156,7 +165,7 @@ export default async function DashboardPage() {
               {recentAdmissions.length === 0 ? (
                 <div className="p-12 text-center text-slate-400 font-medium">No recent activity</div>
               ) : (
-                recentAdmissions.map((record) => {
+                recentAdmissions.map((record: RecentAdmission) => {
                   const isNew = !record.IsViewed && (new Date().getTime() - new Date(record.CreatedAt).getTime() < 24 * 60 * 60 * 1000);
                   return (
                     <div key={record.Id} className="p-4 hover:bg-slate-50/50 transition-colors flex items-center justify-between">
@@ -182,7 +191,8 @@ export default async function DashboardPage() {
                           <div className="text-xs font-bold text-slate-500">{new Date(record.CreatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                           <div className="text-[10px] font-semibold text-slate-400 uppercase">{new Date(record.CreatedAt).toLocaleDateString()}</div>
                         </div>
-                        <DashboardClient id={record.Id} patient={record} />
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        <DashboardClient patient={record as any} />
                       </div>
                     </div>
                   );

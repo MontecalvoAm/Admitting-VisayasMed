@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 interface InputFieldProps {
   label: string;
@@ -14,7 +15,7 @@ interface InputFieldProps {
   className?: string;
   min?: string;
   isReadOnly?: boolean;
-  icon?: any;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 interface SelectFieldProps {
@@ -27,7 +28,7 @@ interface SelectFieldProps {
   error?: string;
   className?: string;
   isReadOnly?: boolean;
-  icon?: any;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 interface CheckboxFieldProps {
@@ -52,6 +53,10 @@ export function InputField({
   isReadOnly = false,
   icon: Icon,
 }: InputFieldProps) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === "password";
+  const currentType = isPassword ? (showPassword ? "text" : "password") : type;
+
   return (
     <div className={`flex flex-col gap-2 ${className}`}>
       <label htmlFor={name} className="text-[13px] font-bold text-slate-700 flex items-center gap-1.5 ml-1">
@@ -59,26 +64,40 @@ export function InputField({
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </label>
-      <input
-        id={name}
-        type={type}
-        name={name}
-        value={typeof value === "boolean" ? "" : String(value)}
-        onChange={onChange}
-        placeholder={placeholder}
-        required={required}
-        min={min}
-        readOnly={isReadOnly}
-        suppressHydrationWarning={true}
-        className={`
-          w-full px-4 py-3 text-sm font-medium text-slate-900 bg-white
-          border-2 border-slate-300 rounded-xl outline-none
-          transition-all duration-200
-          placeholder:text-slate-400
-          ${error ? "border-red-200 bg-red-50/30" : "hover:border-slate-400 focus:border-[#3b67a1] focus:ring-4 focus:ring-blue-100"}
-          ${isReadOnly ? "bg-slate-50/50 text-slate-500 cursor-not-allowed border-slate-200" : ""}
-        `}
-      />
+      <div className="relative">
+        <input
+          id={name}
+          type={currentType}
+          name={name}
+          value={typeof value === "boolean" ? "" : String(value)}
+          onChange={onChange}
+          placeholder={placeholder}
+          required={required}
+          min={min}
+          readOnly={isReadOnly}
+          suppressHydrationWarning={true}
+          className={`
+            w-full px-4 py-3 text-sm font-medium text-slate-900 bg-white
+            border-2 border-slate-300 rounded-xl outline-none
+            transition-all duration-200
+            placeholder:text-slate-400
+            ${error ? "border-red-200 bg-red-50/30" : "hover:border-slate-400 focus:border-[#3b67a1] focus:ring-4 focus:ring-blue-100"}
+            ${isReadOnly ? "bg-slate-50/50 text-slate-500 cursor-not-allowed border-slate-200" : ""}
+            ${isPassword && !isReadOnly ? "pr-12" : ""}
+          `}
+        />
+        {isPassword && !isReadOnly && (
+          <button
+            type="button"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+            onClick={() => setShowPassword(!showPassword)}
+            tabIndex={-1}
+            title={showPassword ? "Hide password" : "Show password"}
+          >
+            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+          </button>
+        )}
+      </div>
       {error && (
         <p className="text-[11px] text-red-500 font-bold ml-1 mt-0.5 uppercase tracking-wide">{error}</p>
       )}

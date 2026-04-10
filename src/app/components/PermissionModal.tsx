@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Shield, Loader2, Save, X, Check, AlertCircle, Info } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Shield, Loader2, Save, Check, AlertCircle } from 'lucide-react';
 import Modal from './Modal';
 import Pagination from './Pagination';
 
@@ -36,7 +36,6 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
   targetName,
   userRoleId,
 }) => {
-  const [modules, setModules] = useState<Module[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -46,20 +45,13 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchInitialData();
-    }
-  }, [isOpen, targetId, targetType, userRoleId]);
-
-  const fetchInitialData = async () => {
+  const fetchInitialData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       // 1. Fetch modules first
       const modulesRes = await fetch('/api/rbac/modules');
-      const modulesData = await modulesRes.json();
-      setModules(modulesData);
+      const modulesData: Module[] = await modulesRes.json();
 
       // 2. Fetch target permissions (Role or User Overrides)
       const endpoint = targetType === 'role' 
@@ -67,10 +59,10 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
         : `/api/rbac/users/${targetId}/permissions`;
       
       const permRes = await fetch(endpoint);
-      const permData = await permRes.json();
+      const permData: Permission[] = await permRes.json();
       
       // 3. For Users, also fetch the Role's default permissions for context
-      let roleDefaults: any[] = [];
+      let roleDefaults: Permission[] = [];
       if (targetType === 'user' && userRoleId) {
         const roleRes = await fetch(`/api/rbac/roles/${userRoleId}/permissions`);
         if (roleRes.ok) {
@@ -80,8 +72,8 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
       
       // 4. Initialize permissions for all modules
       const initialPerms = modulesData.map((mod: Module) => {
-        const userOverride = permData.find((p: any) => p.ModuleID === mod.ModuleID);
-        const roleDefault = roleDefaults.find((p: any) => p.ModuleID === mod.ModuleID);
+        const userOverride = permData.find((p: Permission) => p.ModuleID === mod.ModuleID);
+        const roleDefault = roleDefaults.find((p: Permission) => p.ModuleID === mod.ModuleID);
         
         // If it's a user override modal, start with user's overrides if they exist,
         // otherwise fall back to the role defaults so the admin is starting 
@@ -128,7 +120,13 @@ const PermissionModal: React.FC<PermissionModalProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [targetId, targetType, userRoleId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchInitialData();
+    }
+  }, [isOpen, fetchInitialData]);
 
   const handleToggle = (moduleId: number, field: keyof Permission) => {
     setPermissions(prev => prev.map(p => {

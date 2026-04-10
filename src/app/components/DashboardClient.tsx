@@ -4,12 +4,13 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import PatientActions from './PatientActions';
 
+import { AdmitData } from '@/lib/schemas';
+
 interface DashboardClientProps {
-  id: number;
-  patient: any;
+  patient: AdmitData & { Id: number; CreatedAt?: string };
 }
 
-const DashboardClient: React.FC<DashboardClientProps> = ({ id, patient }) => {
+const DashboardClient: React.FC<DashboardClientProps> = ({ patient }) => {
   const router = useRouter();
 
   return (

@@ -3,7 +3,7 @@ import pool from '@/lib/db';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { getSession } from '@/lib/session';
 import { hasPermission } from '@/lib/rbac';
-import { recordAuditLog } from '@/lib/auditLogger';
+import { recordAuditLog, AuditAction, AuditResource } from '@/lib/auditLogger';
 
 export async function DELETE(req: NextRequest) {
   const session = await getSession();
@@ -86,8 +86,8 @@ export async function DELETE(req: NextRequest) {
 
     // Record Audit Log
     await recordAuditLog({
-      action: 'PERMANENT_DELETE' as any,
-      resource: resourceName as any,
+      action: 'PERMANENT_DELETE' as AuditAction,
+      resource: resourceName as AuditResource,
       resourceId: id.toString(),
       details: `${resourceName} record permanently deleted from database: ${nameLog}`
     });

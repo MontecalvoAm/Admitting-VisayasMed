@@ -20,13 +20,13 @@ export async function PUT(
     }
 
     // Update the IsViewed status
-    const [result] = await pool.query(
+    await pool.query(
       'UPDATE M_Admissions SET IsViewed = 1 WHERE AdmissionID = ?',
       [admissionId]
     );
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error marking admission as viewed:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }

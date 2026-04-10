@@ -16,6 +16,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, width =
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsRendered(true);
       document.body.style.overflow = 'hidden';
     } else {

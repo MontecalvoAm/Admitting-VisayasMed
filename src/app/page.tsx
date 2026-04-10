@@ -5,22 +5,20 @@ import {
   User,
   Users,
   Phone,
-  CheckCircle2,
   AlertCircle,
   ChevronRight,
   ChevronLeft,
   Eye,
   Loader2,
   ClipboardCheck,
-  X,
+  Layout,
 } from "lucide-react";
 import StepIndicator from "./components/StepIndicator";
 import FormStep from "./components/FormStep";
 import { InputField, SelectField, CheckboxField } from "./components/InputField";
 import PrintableForm from "./components/PrintableForm";
-import Modal from "./components/Modal";
 import { useStatusModal } from "./components/StatusModalContext";
- circular_dependency_warning: false
+// Patient Admission Form Component
 
 /* ─── Schema Types (mirrors /api/form-schema) ─── */
 interface FieldOption {
@@ -87,8 +85,7 @@ export default function AdmittingForm() {
   const [formData, setFormData] = useState<FormData>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
-  const [errorMessage, setErrorMessage] = useState("");
-  const { showSuccess, showError, setLoading: setGlobalLoading } = useStatusModal();
+  const { showSuccess, showError } = useStatusModal();
 
   /* ─── Fetch schema on mount ─── */
   useEffect(() => {
@@ -189,7 +186,7 @@ export default function AdmittingForm() {
     setStatus("idle");
     setCurrentStepIndex((prev) => Math.min(prev + 1, totalSteps - 1));
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [validateCurrentStep, totalSteps]);
+  }, [validateCurrentStep, totalSteps, showError]);
 
   const handleBack = useCallback(() => {
     setCurrentStepIndex((prev) => Math.max(prev - 1, 0));
@@ -246,10 +243,11 @@ export default function AdmittingForm() {
       setCurrentStepIndex(0);
       setErrors({});
       setStatus("idle");
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
+      const msg = err instanceof Error ? err.message : "Submission Failed";
       setStatus("error");
-      showError("Submission Failed", "Something went wrong while submitting the form. Please try again or contact support.");
+      showError("Submission Failed", msg);
     }
   };
 
@@ -317,7 +315,7 @@ export default function AdmittingForm() {
               <p className="text-sm font-medium text-slate-500 m-0 mt-1">Please carefully review all details below before finalizing the admission.</p>
             </div>
           </div>
-          <PrintableForm formData={formData as any} />
+          <PrintableForm formData={formData as Record<string, unknown>} />
         </div>
       );
     }
@@ -333,14 +331,52 @@ export default function AdmittingForm() {
       2: "Emergency contact details and account responsibility",
     };
 
+    // Group fields by section headers
+    const renderContent = () => {
+      const parts: React.ReactNode[] = [];
+      let currentGroup: SchemaField[] = [];
+
+      const flushGroup = (index: number) => {
+        if (currentGroup.length > 0) {
+          parts.push(
+            <div key={`group-${index}`} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8 text-left">
+              {currentGroup.map((f) => renderDynamicField(f))}
+            </div>
+          );
+          currentGroup = [];
+        }
+      };
+
+      stepFields.forEach((field, idx) => {
+        if (field.type === "text" as string && field.name === "section_header") { // special handling for section headers if they ever exist as mock types
+          // Flush existing group
+          flushGroup(idx);
+          // Add section header
+          parts.push(
+            <div key={`section-${field.id}`} className={`col-span-1 sm:col-span-2 lg:col-span-4 flex items-center gap-2 ${parts.length === 0 ? "mt-1" : "mt-8"} mb-4 pb-2 border-b border-slate-100`}>
+              <div className="p-1.5 bg-slate-50 rounded-lg">
+                <Layout className="w-4 h-4 text-slate-500" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">{field.label}</h3>
+            </div>
+          );
+        } else {
+          currentGroup.push(field);
+        }
+      });
+
+      flushGroup(-1);
+      return parts;
+    };
+
     return (
       <FormStep
         title={currentStep.label}
         description={descriptions[currentStepIndex] ?? "Fill in the required fields"}
         Icon={StepIcon}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-8 text-left">
-          {stepFields.map((field) => renderDynamicField(field))}
+        <div className="space-y-4">
+          {renderContent()}
         </div>
       </FormStep>
     );

@@ -6,6 +6,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Modal from './Modal';
 import PatientForm from './PatientForm';
 
+import { AdmitData } from '@/lib/schemas';
+
+interface PatientPermissions {
+  CanView: boolean;
+  CanAdd: boolean;
+  CanEdit: boolean;
+  CanDelete: boolean;
+}
+
 const PatientsRegistryHeader = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -16,10 +25,10 @@ const PatientsRegistryHeader = () => {
   const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [newPatient, setNewPatient] = useState<any>({});
+  const [newPatient, setNewPatient] = useState<Partial<AdmitData>>({});
   
   // RBAC State
-  const [permissions, setPermissions] = useState<any>(null);
+  const [permissions, setPermissions] = useState<PatientPermissions | null>(null);
   const [isLoadingPerms, setIsLoadingPerms] = useState(true);
 
   const hasActiveFilters = searchTerm || dateFilter || caseTypeFilter;
@@ -33,7 +42,7 @@ const PatientsRegistryHeader = () => {
       const res = await fetch('/api/rbac/permissions/me');
       if (res.ok) {
         const data = await res.json();
-        const mod = data.find((p: any) => p.ModuleName === 'Patients');
+        const mod = data.find((p: { ModuleName: string }) => p.ModuleName === 'Patients');
         setPermissions(mod || { CanView: true, CanAdd: false, CanEdit: false, CanDelete: false });
       }
     } catch (err) {
@@ -93,7 +102,7 @@ const PatientsRegistryHeader = () => {
 
   const handlePatientChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setNewPatient((prev: any) => ({ ...prev, [name]: value }));
+    setNewPatient((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSavePatient = async () => {

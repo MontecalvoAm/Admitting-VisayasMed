@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
-import { ResultSetHeader } from 'mysql2';
+import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { getSession } from '@/lib/session';
 
 export async function PUT(
@@ -45,7 +45,7 @@ export async function DELETE(
     const deletedBy = session ? `${session.firstName} ${session.lastName}` : 'System';
 
     // Check if role has active users
-    const [users] = await pool.query<any[]>(
+    const [users] = await pool.query<RowDataPacket[]>(
       'SELECT COUNT(*) as count FROM M_Users WHERE RoleID = ? AND IsDeleted = false',
       [roleId]
     );

@@ -4,8 +4,10 @@ import React from 'react';
 import { User, Users, Phone, FileText } from 'lucide-react';
 import { InputField, SelectField } from './InputField';
 
+import { AdmitData } from '@/lib/schemas';
+
 interface PatientFormProps {
-  formData: any;
+  formData: Partial<AdmitData & { Id?: number; CreatedAt?: string }>;
   onChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   isReadOnly?: boolean;
 }
@@ -33,12 +35,12 @@ const PatientForm: React.FC<PatientFormProps> = ({ formData, onChange, isReadOnl
         const newAge = calculateAge(value);
         onChange({
           target: { name: "Age", value: newAge }
-        } as any);
+        } as unknown as React.ChangeEvent<HTMLInputElement>);
       }
     }
   };
 
-  const sectionHeader = (title: string, Icon: any) => (
+  const sectionHeader = (title: string, Icon: React.ComponentType<{ className?: string }>) => (
     <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
       <div className="p-1.5 bg-slate-50 rounded-lg">
         <Icon className="w-4 h-4 text-slate-500" />
@@ -120,13 +122,13 @@ const PatientForm: React.FC<PatientFormProps> = ({ formData, onChange, isReadOnl
       <section>
         {sectionHeader("Family Information", Users)}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-4 font-bold text-xs text-slate-400 uppercase">Father's Info</div>
+          <div className="lg:col-span-4 font-bold text-xs text-slate-400 uppercase">Father&apos;s Info</div>
           <InputField label="Family Name" name="FatherFamilyName" value={formData.FatherFamilyName || ''} onChange={handleChange} className={isReadOnly ? "pointer-events-none opacity-80" : ""} />
           <InputField label="Given Name" name="FatherGivenName" value={formData.FatherGivenName || ''} onChange={handleChange} className={isReadOnly ? "pointer-events-none opacity-80" : ""} />
           <InputField label="Middle Name" name="FatherMiddleName" value={formData.FatherMiddleName || ''} onChange={handleChange} className={isReadOnly ? "pointer-events-none opacity-80" : ""} />
           <InputField label="Contact" name="FatherContact" value={formData.FatherContact || ''} onChange={handleChange} className={isReadOnly ? "pointer-events-none opacity-80" : ""} />
 
-          <div className="lg:col-span-4 font-bold text-xs text-slate-400 uppercase mt-2">Mother's Info</div>
+          <div className="lg:col-span-4 font-bold text-xs text-slate-400 uppercase mt-2">Mother&apos;s Info</div>
           <InputField label="Family Name" name="MotherFamilyName" value={formData.MotherFamilyName || ''} onChange={handleChange} className={isReadOnly ? "pointer-events-none opacity-80" : ""} />
           <InputField label="Given Name" name="MotherGivenName" value={formData.MotherGivenName || ''} onChange={handleChange} className={isReadOnly ? "pointer-events-none opacity-80" : ""} />
           <InputField label="Middle Name" name="MotherMiddleName" value={formData.MotherMiddleName || ''} onChange={handleChange} className={isReadOnly ? "pointer-events-none opacity-80" : ""} />
@@ -185,7 +187,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ formData, onChange, isReadOnl
             onChange={(e) => {
               const val = e.target.value === "Yes";
               if (onChange) {
-                onChange({ target: { name: "PreviouslyAdmitted", value: val } } as any);
+                onChange({ target: { name: "PreviouslyAdmitted", value: val } } as unknown as React.ChangeEvent<HTMLInputElement>);
               }
             }}
             options={[
@@ -229,7 +231,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ formData, onChange, isReadOnl
             onChange={(e) => {
               const val = e.target.value === "Yes";
               if (onChange) {
-                onChange({ target: { name: "HmoCompany", value: val } } as any);
+                onChange({ target: { name: "HmoCompany", value: val } } as unknown as React.ChangeEvent<HTMLInputElement>);
               }
             }}
             options={[

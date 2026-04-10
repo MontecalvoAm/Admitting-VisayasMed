@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Check, ClipboardCheck } from "lucide-react";
+import { Check } from "lucide-react";
 
 interface Step {
   label: string;
@@ -17,11 +17,10 @@ export default function StepIndicator({ steps, currentStep }: StepIndicatorProps
   return (
     <div className="w-full px-4 sm:px-8">
       <div className="flex items-center justify-between relative">
-        {steps.map((step, index) => {
+        {steps.map((step: Step, index) => {
           const stepNumber = index + 1;
           const isCompleted = stepNumber < currentStep;
           const isActive = stepNumber === currentStep;
-          const isUpcoming = stepNumber > currentStep;
 
           return (
             <React.Fragment key={index}>

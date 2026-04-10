@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search');
 
     let query = 'SELECT * FROM M_AuditLogs WHERE 1=1';
-    const params: any[] = [];
+    const params: (string | number)[] = [];
 
     if (action) {
       query += ' AND Action = ?';
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
     
     // Get total count
     let countQuery = 'SELECT COUNT(*) as total FROM M_AuditLogs WHERE 1=1';
-    const countParams: any[] = [];
+    const countParams: (string | number)[] = [];
     if (action) { countQuery += ' AND Action = ?'; countParams.push(action); }
     if (resource) { countQuery += ' AND Resource = ?'; countParams.push(resource); }
     if (search) { countQuery += ' AND (UserName LIKE ? OR Details LIKE ? OR ResourceID LIKE ?)'; countParams.push(`%${search}%`, `%${search}%`, `%${search}%`); }
