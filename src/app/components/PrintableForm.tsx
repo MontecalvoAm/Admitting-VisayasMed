@@ -449,19 +449,29 @@ export default function PrintableForm({ formData }: PrintableFormProps) {
           </div>
           {/* Signature lines */}
           <div style={S.grid(3)}>
-            <div style={{ ...S.cell, minHeight: "50px" }}>
+            <div style={{ ...S.cell, minHeight: "55px", display: "flex", flexDirection: "column" }}>
               <span style={S.cellLabel}>Signature</span>
-              <div style={{ borderBottom: "1.5px solid #111827", marginTop: "24px", width: "95%" }} />
+              <div style={{ marginTop: "auto", textAlign: "center", width: "95%" }}>
+                <span style={{ ...S.cellValue, fontSize: "11px", fontWeight: 700, textTransform: "uppercase", marginBottom: "2px" }}>
+                  {formData.ResponsibleName || "\u00A0"}
+                </span>
+                <div style={{ borderBottom: "1.5px solid #111827", width: "100%" }} />
+                <span style={{ fontSize: "7px", color: "#4b5563", fontWeight: 700, display: "block", textTransform: "uppercase", letterSpacing: "0.3px", marginTop: "1px" }}>
+                  Signature over Printed Name
+                </span>
+              </div>
             </div>
-            <div style={{ ...S.cell, minHeight: "50px" }}>
-              <span style={S.cellLabel}>Printed Name / Relation to Patient</span>
-              <span style={{ ...S.cellValue, marginTop: "12px", fontSize: "11.5px" }}>
-                {[formData.ResponsibleName, formData.ResponsibleRelation].filter(Boolean).join(" — ") || "\u00A0"}
+            <div style={{ ...S.cell, minHeight: "55px" }}>
+              <span style={S.cellLabel}>Relation to Patient</span>
+              <span style={{ ...S.cellValue, marginTop: "16px", fontSize: "11.5px" }}>
+                {formData.ResponsibleRelation || "\u00A0"}
               </span>
             </div>
-            <div style={{ ...S.cell, minHeight: "50px" }}>
+            <div style={{ ...S.cell, minHeight: "55px" }}>
               <span style={S.cellLabel}>Date Signed</span>
-              <span style={{ ...S.cellValue, marginTop: "12px", fontSize: "11.5px" }}>{isMounted && !formData.isEmptyForm ? new Date().toLocaleDateString() : ""}</span>
+              <span style={{ ...S.cellValue, marginTop: "16px", fontSize: "11.5px" }}>
+                {isMounted && !formData.isEmptyForm ? new Date().toLocaleDateString() : "\u00A0"}
+              </span>
             </div>
           </div>
         </div>
@@ -499,7 +509,7 @@ export default function PrintableForm({ formData }: PrintableFormProps) {
         >
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 800, color: "#1e3a5f", textTransform: "uppercase", letterSpacing: "0.5px" }}>VisayasMed Hospital</div>
-            <div style={{ fontWeight: 500 }}>Form No. VMH-ADM-001 • Rev. 2026</div>
+            <div style={{ fontWeight: 500 }}>Form No. {formData.ControlNumber || "VMH-ADM-001"} • Rev. 2026</div>
           </div>
           <div style={{ flex: 2, textAlign: "center", padding: "0 10px", fontStyle: "italic", fontSize: "6.5px", fontWeight: 500 }}>
             This document contains confidential patient information protected under the Data Privacy Act of 2012 (R.A. 10173).
