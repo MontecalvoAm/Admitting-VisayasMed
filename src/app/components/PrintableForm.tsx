@@ -509,7 +509,7 @@ export default function PrintableForm({ formData }: PrintableFormProps) {
         >
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 800, color: "#1e3a5f", textTransform: "uppercase", letterSpacing: "0.5px" }}>VisayasMed Hospital</div>
-            <div style={{ fontWeight: 500 }}>Form No. VMH-ADM-001 • Rev. 2026</div>
+            <div style={{ fontWeight: 500 }}>Form No. {formData.ControlNumber || "VMH-ADM-001"} • Rev. 2026</div>
           </div>
           <div style={{ flex: 2, textAlign: "center", padding: "0 10px", fontStyle: "italic", fontSize: "6.5px", fontWeight: 500 }}>
             This document contains confidential patient information protected under the Data Privacy Act of 2012 (R.A. 10173).

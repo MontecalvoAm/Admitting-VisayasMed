@@ -55,18 +55,33 @@ export async function POST(req: NextRequest) {
       patientId = patientResult.insertId;
     }
 
-    // 2. Create Admission Record
+    // 2. Calculate ControlNumber (YYYYMMDD-N, reset monthly)
+    const now = new Date();
+    const dateString = now.getFullYear().toString() + 
+                       (now.getMonth() + 1).toString().padStart(2, '0') + 
+                       now.getDate().toString().padStart(2, '0');
+    
+    // Use the active transaction for the count query
+    const [countResult] = await connection.query<RowDataPacket[]>(
+      `SELECT COUNT(*) as count FROM M_Admissions 
+       WHERE YEAR(CreatedAt) = YEAR(CURRENT_TIMESTAMP) 
+         AND MONTH(CreatedAt) = MONTH(CURRENT_TIMESTAMP)`
+    );
+    const sequence = (countResult[0]?.count || 0) + 1;
+    const controlNumber = `${dateString}-${sequence}`;
+
+    // 3. Create Admission Record
     const [admissionResult] = await connection.execute<ResultSetHeader>(
       `INSERT INTO M_Admissions (
         PatientID, Age, AttendingPhysician, PreviouslyAdmitted, PreviousAdmissionDate, PhilHealthStatus, 
-        HmoCompany, VmcBenefit, ServiceCaseType,
+        HmoCompany, VmcBenefit, ServiceCaseType, ControlNumber,
         PrintedNameSignature, RelationToPatientSignature, NameSignature2,
         CreatedBy
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         patientId, data.Age || null, data.AttendingPhysician || null, data.PreviouslyAdmitted || false, 
         data.PreviousAdmissionDate || null, data.PhilHealthStatus || null, data.HmoCompany || false, 
-        data.VmcBenefit || null, data.ServiceCaseType || null,
+        data.VmcBenefit || null, data.ServiceCaseType || null, controlNumber,
         data.PrintedNameSignature || null, data.RelationToPatientSignature || null, data.NameSignature2 || null,
         'System'
       ]
@@ -78,10 +93,10 @@ export async function POST(req: NextRequest) {
       action: 'CREATE',
       resource: 'Patient',
       resourceId: patientId,
-      details: `New admission recorded for patient ${data.LastName}, ${data.GivenName}.`
+      details: `New admission (${controlNumber}) recorded for patient ${data.LastName}, ${data.GivenName}.`
     });
 
-    return NextResponse.json({ success: true, id: patientId, admissionId: admissionResult.insertId }, { status: 201 });
+    return NextResponse.json({ success: true, id: patientId, admissionId: admissionResult.insertId, controlNumber }, { status: 201 });
   } catch (error) {
     await connection.rollback();
     console.error('Error creating patient admission:', error);
