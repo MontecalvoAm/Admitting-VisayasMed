@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .gitignore
+
+# files staged for deletion review
+/for-deletion/
