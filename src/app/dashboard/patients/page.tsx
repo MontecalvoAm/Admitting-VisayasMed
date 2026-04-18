@@ -1,9 +1,10 @@
 import React from 'react';
-import pool from '@/lib/db';
+import { readPool } from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import { getSession } from '@/lib/session';
 import { redirect } from 'next/navigation';
 import { hasPermission } from '@/lib/rbac';
+import { getCachedData } from '@/lib/redisCache';
 import PaginationWrapper from '@/app/components/PaginationWrapper';
 import PatientRow from '@/app/components/PatientRow';
 import PatientsRegistryHeader from '@/app/components/PatientsRegistryHeader';
@@ -54,7 +55,7 @@ async function getAdmissions(page: number, limit: number, search?: string, date?
 
   query += ` ORDER BY a.AdmittedAt DESC LIMIT ? OFFSET ?`;
   
-  const [rows] = await pool.query<RowDataPacket[]>(query, [...params, limit, offset]);
+  const [rows] = await readPool.query<RowDataPacket[]>(query, [...params, limit, offset]);
   
   // Total count query (much simpler now)
   let countQuery = `
@@ -87,11 +88,19 @@ async function getAdmissions(page: number, limit: number, search?: string, date?
     countQuery += ` AND ${countConditions.join(' AND ')}`;
   }
 
-  const [countRows] = await pool.query<RowDataPacket[]>(countQuery, countParams);
+  const cacheKey = `patients:count:${search}:${date}:${caseType}`;
+  const totalItems = await getCachedData(
+    cacheKey,
+    async () => {
+      const [countRows] = await readPool.query<RowDataPacket[]>(countQuery, countParams);
+      return (countRows[0] as { count: number }).count;
+    },
+    60 // Cache pagination count for 60 seconds
+  );
   
   return {
     admissions: JSON.parse(JSON.stringify(rows)),
-    totalItems: (countRows[0] as { count: number }).count,
+    totalItems,
   };
 }
 

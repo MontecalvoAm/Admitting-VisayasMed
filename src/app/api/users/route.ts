@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { getSession } from '@/lib/session';
 import { UserSchema } from '@/lib/schemas';

@@ -1,5 +1,6 @@
 import pool from './db';
 import { RowDataPacket } from 'mysql2';
+import { getCachedData } from './redisCache';
 
 export interface ModulePermission {
   ModuleID: number;
@@ -12,46 +13,52 @@ export interface ModulePermission {
 }
 
 export async function getEffectivePermissions(userId: number, roleId: number): Promise<ModulePermission[]> {
-  try {
-    // 1. Fetch all modules
-    const [modules] = await pool.query<RowDataPacket[]>(
-      'SELECT ModuleID, ModuleName, ModulePath FROM M_Modules WHERE IsDeleted = false ORDER BY SortOrder'
-    );
+  return getCachedData(
+    `permissions:user:${userId}:role:${roleId}`,
+    async () => {
+      try {
+        // 1. Fetch all modules
+        const [modules] = await pool.query<RowDataPacket[]>(
+          'SELECT ModuleID, ModuleName, ModulePath FROM M_Modules WHERE IsDeleted = false ORDER BY SortOrder'
+        );
 
-    // 2. Fetch role defaults
-    const [rolePerms] = await pool.query<RowDataPacket[]>(
-      'SELECT ModuleID, CanView, CanAdd, CanEdit, CanDelete FROM M_RolePermissions WHERE RoleID = ? AND IsDeleted = false',
-      [roleId]
-    );
+        // 2. Fetch role defaults
+        const [rolePerms] = await pool.query<RowDataPacket[]>(
+          'SELECT ModuleID, CanView, CanAdd, CanEdit, CanDelete FROM M_RolePermissions WHERE RoleID = ? AND IsDeleted = false',
+          [roleId]
+        );
 
-    // 3. Fetch user overrides
-    const [userPerms] = await pool.query<RowDataPacket[]>(
-      'SELECT ModuleID, CanView, CanAdd, CanEdit, CanDelete FROM M_UserPermissions WHERE UserID = ? AND IsDeleted = false',
-      [userId]
-    );
+        // 3. Fetch user overrides
+        const [userPerms] = await pool.query<RowDataPacket[]>(
+          'SELECT ModuleID, CanView, CanAdd, CanEdit, CanDelete FROM M_UserPermissions WHERE UserID = ? AND IsDeleted = false',
+          [userId]
+        );
 
-    // 4. Merge permissions
-    // Logic: If user override exists for a module, use it. Otherwise, use role default.
-    const effective: ModulePermission[] = modules.map(mod => {
-      const uPerm = userPerms.find(p => p.ModuleID === mod.ModuleID);
-      const rPerm = rolePerms.find(p => p.ModuleID === mod.ModuleID);
+        // 4. Merge permissions
+        // Logic: If user override exists for a module, use it. Otherwise, use role default.
+        const effective: ModulePermission[] = modules.map(mod => {
+          const uPerm = userPerms.find(p => p.ModuleID === mod.ModuleID);
+          const rPerm = rolePerms.find(p => p.ModuleID === mod.ModuleID);
 
-      return {
-        ModuleID: mod.ModuleID,
-        ModuleName: mod.ModuleName,
-        ModulePath: mod.ModulePath,
-        CanView: !!(uPerm ? uPerm.CanView : rPerm?.CanView),
-        CanAdd: !!(uPerm ? uPerm.CanAdd : rPerm?.CanAdd),
-        CanEdit: !!(uPerm ? uPerm.CanEdit : rPerm?.CanEdit),
-        CanDelete: !!(uPerm ? uPerm.CanDelete : rPerm?.CanDelete),
-      };
-    });
+          return {
+            ModuleID: mod.ModuleID,
+            ModuleName: mod.ModuleName,
+            ModulePath: mod.ModulePath,
+            CanView: !!(uPerm ? uPerm.CanView : rPerm?.CanView),
+            CanAdd: !!(uPerm ? uPerm.CanAdd : rPerm?.CanAdd),
+            CanEdit: !!(uPerm ? uPerm.CanEdit : rPerm?.CanEdit),
+            CanDelete: !!(uPerm ? uPerm.CanDelete : rPerm?.CanDelete),
+          };
+        });
 
-    return effective;
-  } catch (error) {
-    console.error('Error calculating effective permissions:', error);
-    return [];
-  }
+        return effective;
+      } catch (error) {
+        console.error('Error calculating effective permissions:', error);
+        return [];
+      }
+    },
+    300 // Cache for 5 minutes
+  );
 }
 
 /**
