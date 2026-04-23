@@ -177,8 +177,8 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
         if (err.details && typeof err.details === 'object') {
           const detailMsgs = Object.entries(err.details)
             .filter(([key]) => key !== '_errors')
-            .map(([field, info]: [string, ValidationErrorDetail]) => {
-              const fieldErrors = info._errors || [];
+            .map(([field, info]) => {
+              const fieldErrors = (info as ValidationErrorDetail)._errors || [];
               return `${field}: ${fieldErrors.join(', ')}`;
             });
           if (detailMsgs.length > 0) {
@@ -218,8 +218,8 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
         if (err.details && typeof err.details === 'object') {
           const detailMsgs = Object.entries(err.details)
             .filter(([key]) => key !== '_errors')
-            .map(([field, info]: [string, ValidationErrorDetail]) => {
-              const fieldErrors = info._errors || [];
+            .map(([field, info]) => {
+              const fieldErrors = (info as ValidationErrorDetail)._errors || [];
               return `${field}: ${fieldErrors.join(', ')}`;
             });
           if (detailMsgs.length > 0) {
