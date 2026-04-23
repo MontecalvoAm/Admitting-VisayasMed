@@ -58,8 +58,8 @@ export const UserSchema = z.object({
   FirstName: z.string().min(1, "First name is required").max(100),
   LastName: z.string().min(1, "Last name is required").max(100),
   Email: z.string().email("Invalid email format").max(255),
-  RoleID: z.number().int().positive("Role ID must be valid"),
-  Password: z.string().min(8, "Password must be at least 8 characters").optional(), // Optional for updates
+  RoleID: z.coerce.number().int().positive("Role ID must be valid"),
+  Password: z.string().min(8, "Password must be at least 8 characters").or(z.literal("")).optional(), // Optional or empty for updates
 });
 
 export const PatientSchema = z.object({

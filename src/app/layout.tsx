@@ -16,6 +16,7 @@ export const metadata: Metadata = {
 
 import { Toaster } from "react-hot-toast";
 import { StatusModalProvider } from "./components/StatusModalContext";
+import { SidebarProvider } from "./components/SidebarContext";
 
 export default function RootLayout({
   children,
@@ -26,8 +27,10 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} h-full`}>
       <body className="min-h-full flex flex-col antialiased">
         <StatusModalProvider>
-          <Toaster position="top-right" />
-          {children}
+          <SidebarProvider>
+            <Toaster position="top-right" />
+            {children}
+          </SidebarProvider>
         </StatusModalProvider>
       </body>
     </html>

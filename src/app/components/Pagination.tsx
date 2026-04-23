@@ -59,6 +59,7 @@ const Pagination: React.FC<PaginationProps> = ({
             <select
               value={itemsPerPage}
               onChange={(e) => onLimitChange(Number(e.target.value))}
+              suppressHydrationWarning
               className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm font-bold text-slate-700 bg-slate-50/50 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-vmed-blue/20 transition-all cursor-pointer"
             >
               {[5, 10, 20, 50, 100].map((limit) => (

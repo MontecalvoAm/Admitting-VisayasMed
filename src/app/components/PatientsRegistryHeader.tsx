@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Plus, Calendar, Loader2, X, ShieldAlert, RefreshCcw, Filter } from 'lucide-react';
+import { Search, Plus, Calendar, Loader2, X, ShieldAlert, RefreshCcw, Filter } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Modal from './Modal';
 import PatientForm from './PatientForm';
@@ -18,7 +18,7 @@ interface PatientPermissions {
 const PatientsRegistryHeader = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [dateFilter, setDateFilter] = useState(searchParams.get('date') || '');
   const [caseTypeFilter, setCaseTypeFilter] = useState(searchParams.get('caseType') || '');
@@ -26,7 +26,7 @@ const PatientsRegistryHeader = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [newPatient, setNewPatient] = useState<Partial<AdmitData>>({});
-  
+
   // RBAC State
   const [permissions, setPermissions] = useState<PatientPermissions | null>(null);
   const [isLoadingPerms, setIsLoadingPerms] = useState(true);
@@ -132,59 +132,59 @@ const PatientsRegistryHeader = () => {
 
   return (
     <>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Patients Registry</h2>
-          <p className="text-sm text-slate-500 font-medium">Manage and view all admitted patients information.</p>
+          <h2 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight uppercase">Patients Registry</h2>
+          <p className="text-xs md:text-sm text-slate-500 font-medium tracking-tight">Manage and view all admitted patients information.</p>
         </div>
-        
-        <div className="flex items-center gap-3">
-          <button 
+
+        <div className="flex items-center gap-2 md:gap-3">
+          <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="flex items-center gap-2 px-4 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
+            suppressHydrationWarning
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 h-11 md:h-10 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all shadow-sm active:scale-95 disabled:opacity-50"
             title="Refresh Data"
           >
             <RefreshCcw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-vmed-blue-light' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
+            <span className="inline">Refresh</span>
           </button>
 
-          <button className="flex items-center gap-2 px-4 h-10 bg-white border border-slate-200 text-slate-600 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm">
-            <Download className="w-4 h-4" /> Export
-          </button>
-          
           {!isLoadingPerms && permissions?.CanAdd && (
-            <button 
+            <button
               onClick={() => {
                 setNewPatient({});
                 setIsAdmitModalOpen(true);
               }}
-              className="flex items-center gap-2 px-4 h-10 bg-vmed-blue-dark text-white rounded-xl text-sm font-bold hover:bg-vmed-blue-light transition-all shadow-lg shadow-blue-200"
+              suppressHydrationWarning
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 h-11 md:h-10 bg-vmed-blue-dark text-white rounded-xl text-sm font-bold hover:bg-vmed-blue-light transition-all shadow-lg shadow-blue-200 active:scale-95"
             >
-              <Plus className="w-4 h-4" /> Admit Patient
+              <Plus className="w-4 h-4" /> 
+              <span className="whitespace-nowrap">Admit Patient</span>
             </button>
           )}
-          
+
           {!isLoadingPerms && !permissions?.CanAdd && (
-            <div className="flex items-center gap-2 px-4 h-10 bg-slate-100 text-slate-400 rounded-xl text-sm font-bold cursor-not-allowed border border-slate-200">
-               <ShieldAlert className="w-4 h-4" /> Restricted
+            <div className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 h-11 md:h-10 bg-slate-100 text-slate-400 rounded-xl text-sm font-bold cursor-not-allowed border border-slate-200">
+              <ShieldAlert className="w-4 h-4" /> Restricted
             </div>
           )}
         </div>
       </div>
 
-      <div className="glass-panel p-4 rounded-2xl flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[250px]">
+      <div className="glass-panel p-4 rounded-2xl flex flex-col md:flex-row items-stretch md:items-center gap-3 md:gap-4">
+        <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Search by name or physician..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-11 pr-11 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
+            suppressHydrationWarning
+            className="w-full pl-11 pr-11 py-2.5 md:py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
           />
           {searchTerm && (
-            <button 
+            <button
               onClick={() => setSearchTerm('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-slate-500 rounded-lg transition-colors"
             >
@@ -192,26 +192,28 @@ const PatientsRegistryHeader = () => {
             </button>
           )}
         </div>
-        
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[160px]">
+
+        <div className="flex flex-row items-center gap-2 md:gap-3">
+          <div className="relative flex-1 md:min-w-[160px]">
             <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-            <input 
-              type="date" 
+            <input
+              type="date"
               value={dateFilter}
               onChange={handleDateChange}
-              className="w-full pl-11 pr-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-600 font-medium"
+              suppressHydrationWarning
+              className="w-full pl-11 pr-4 py-2.5 md:py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-600 font-medium"
             />
           </div>
 
-          <div className="relative min-w-[160px]">
+          <div className="relative flex-1 md:min-w-[160px]">
             <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <select
               value={caseTypeFilter}
               onChange={handleCaseTypeChange}
-              className="w-full pl-11 pr-10 py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-600 font-medium appearance-none"
+              suppressHydrationWarning
+              className="w-full pl-11 pr-10 py-2.5 md:py-2.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-600 font-medium appearance-none"
             >
-              <option value="">All Case Types</option>
+              <option value="">All Types</option>
               <option value="Private">Private</option>
               <option value="Charity">Charity</option>
               <option value="General">General</option>
@@ -221,14 +223,14 @@ const PatientsRegistryHeader = () => {
           </div>
 
           {hasActiveFilters && (
-            <button 
+            <button
               onClick={() => {
                 setSearchTerm('');
                 setDateFilter('');
                 setCaseTypeFilter('');
                 router.push('?');
               }}
-              className="p-2.5 bg-slate-50 text-slate-400 hover:text-red-500 border border-slate-200 rounded-xl transition-all hover:bg-red-50 group shadow-sm active:scale-95 animate-in fade-in zoom-in duration-200"
+              className="p-3 md:p-2.5 bg-slate-50 text-slate-400 hover:text-red-500 border border-slate-200 rounded-xl transition-all hover:bg-red-50 group shadow-sm active:scale-95 animate-in fade-in zoom-in duration-200"
               title="Clear All Filters"
             >
               <X className="w-4 h-4 group-hover:scale-110 transition-transform" />
@@ -238,23 +240,23 @@ const PatientsRegistryHeader = () => {
       </div>
 
       {/* Admit Patient Modal */}
-      <Modal 
-        isOpen={isAdmitModalOpen} 
-        onClose={() => setIsAdmitModalOpen(false)} 
+      <Modal
+        isOpen={isAdmitModalOpen}
+        onClose={() => setIsAdmitModalOpen(false)}
         title="Admit New Patient"
       >
         <div className="mb-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl">
-           <p className="text-sm text-vmed-blue-dark font-medium">Enter patient details below to create a new admission record. For existing patients, please ensure biographical details match to link records.</p>
+          <p className="text-sm text-vmed-blue-dark font-medium">Enter patient details below to create a new admission record. For existing patients, please ensure biographical details match to link records.</p>
         </div>
         <PatientForm formData={newPatient} onChange={handlePatientChange} />
         <div className="mt-8 flex justify-end gap-3">
-          <button 
+          <button
             onClick={() => setIsAdmitModalOpen(false)}
             className="px-6 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold hover:bg-slate-50 transition-colors"
           >
             Cancel
           </button>
-          <button 
+          <button
             onClick={handleSavePatient}
             disabled={isSaving}
             className="flex items-center gap-2 px-6 py-2 bg-vmed-blue-dark text-white rounded-xl font-bold hover:bg-vmed-blue-light transition-all shadow-lg shadow-blue-200 disabled:opacity-50"

@@ -108,6 +108,9 @@
 
 html, body {
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  position: relative;
 }
 
 * {
@@ -250,15 +253,47 @@ select.form-input {
 }
 
 /* ===== Sidebar & Layout Dynamics ===== */
-aside ~ div {
-  margin-left: var(--sidebar-width);
-  transition: margin-left 0.3s var(--sidebar-transition);
+@media (min-width: 1024px) {
+  aside ~ div {
+    margin-left: var(--sidebar-width);
+    transition: margin-left 0.3s var(--sidebar-transition);
+  }
+
+  /* Selector to match the state set by React */
+  aside[data-collapsed="true"] ~ div {
+    padding-left: 0;
+    margin-left: var(--sidebar-collapsed-width);
+  }
 }
 
-/* Selector to match the state set by React */
-aside[data-collapsed="true"] ~ div {
-  padding-left: 0;
-  margin-left: var(--sidebar-collapsed-width);
+@media (max-width: 1023px) {
+  aside ~ div {
+    margin-left: 0 !important;
+  }
+  
+  aside {
+    transform: translateX(-100%);
+    box-shadow: none !important;
+  }
+  
+  aside[data-mobile-open="true"] {
+    transform: translateX(0);
+    box-shadow: 20px 0 50px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.3);
+    backdrop-filter: blur(4px);
+    z-index: 40;
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 }
 
 /* Header Brand logic - hidden by default */
@@ -365,7 +400,7 @@ aside[data-collapsed="true"] ~ div .header-brand {
 .loginContainer {
   position: relative;
   height: 100vh;
-  width: 100vw;
+  width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -378,6 +413,12 @@ aside[data-collapsed="true"] ~ div .header-brand {
   width: 100%;
   max-width: 1200px;
   height: 90vh; /* Stay fit on 100VH */
+  @media (max-width: 768px) {
+    height: auto;
+    min-height: 95vh;
+    border-radius: 0;
+    border: none;
+  }
   display: flex;
   flex-direction: column;
   background: var(--glass-bg);
@@ -415,6 +456,9 @@ aside[data-collapsed="true"] ~ div .header-brand {
   padding: 2rem;
   scrollbar-width: thin;
   scrollbar-color: var(--neutral-300) transparent;
+  @media (max-width: 640px) {
+    padding: 1.25rem 1rem;
+  }
 }
 
 .wizard-content::-webkit-scrollbar {

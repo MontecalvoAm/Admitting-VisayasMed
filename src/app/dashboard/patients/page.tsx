@@ -1,9 +1,10 @@
 import React from 'react';
-import pool from '@/lib/db';
+import { readPool } from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import { getSession } from '@/lib/session';
 import { redirect } from 'next/navigation';
 import { hasPermission } from '@/lib/rbac';
+import { getCachedData } from '@/lib/redisCache';
 import PaginationWrapper from '@/app/components/PaginationWrapper';
 import PatientRow from '@/app/components/PatientRow';
 import PatientsRegistryHeader from '@/app/components/PatientsRegistryHeader';
@@ -54,7 +55,7 @@ async function getAdmissions(page: number, limit: number, search?: string, date?
 
   query += ` ORDER BY a.AdmittedAt DESC LIMIT ? OFFSET ?`;
   
-  const [rows] = await pool.query<RowDataPacket[]>(query, [...params, limit, offset]);
+  const [rows] = await readPool.query<RowDataPacket[]>(query, [...params, limit, offset]);
   
   // Total count query (much simpler now)
   let countQuery = `
@@ -87,17 +88,27 @@ async function getAdmissions(page: number, limit: number, search?: string, date?
     countQuery += ` AND ${countConditions.join(' AND ')}`;
   }
 
-  const [countRows] = await pool.query<RowDataPacket[]>(countQuery, countParams);
+  const cacheKey = `patients:count:${search}:${date}:${caseType}`;
+  const totalItems = await getCachedData(
+    cacheKey,
+    async () => {
+      const [countRows] = await readPool.query<RowDataPacket[]>(countQuery, countParams);
+      return (countRows[0] as { count: number }).count;
+    },
+    60 // Cache pagination count for 60 seconds
+  );
   
   return {
     admissions: JSON.parse(JSON.stringify(rows)),
-    totalItems: (countRows[0] as { count: number }).count,
+    totalItems,
   };
 }
 
 export const dynamic = 'force-dynamic';
 
 // async function getAdmissions... moved imports to top
+
+import PatientCard from '@/app/components/PatientCard';
 
 export default async function PatientsPage({
   searchParams,
@@ -129,7 +140,7 @@ export default async function PatientsPage({
 
   const awaitedParams = await searchParams;
   const currentPage = Number(awaitedParams.page) || 1;
-  const itemsPerPage = Number(awaitedParams.limit) || 5;
+  const itemsPerPage = Number(awaitedParams.limit) || 10; // Updated default limit for cards
   const search = awaitedParams.search || '';
   const date = awaitedParams.date || '';
   const caseType = awaitedParams.caseType || '';
@@ -141,8 +152,8 @@ export default async function PatientsPage({
     <div className="space-y-6">
       <PatientsRegistryHeader />
 
-      {/* Data Table */}
-      <div className="glass-panel rounded-2xl overflow-hidden">
+      {/* Desktop Table View */}
+      <div className="hidden lg:block glass-panel rounded-2xl overflow-hidden border border-slate-100 shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -157,8 +168,8 @@ export default async function PatientsPage({
             <tbody className="divide-y divide-slate-50">
               {admissions.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium">
-                    No patient records found.
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium italic">
+                    No matching patient records found.
                   </td>
                 </tr>
               ) : (
@@ -170,8 +181,26 @@ export default async function PatientsPage({
             </tbody>
           </table>
         </div>
-        
-        {/* Pagination Section */}
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="lg:hidden space-y-4">
+        {admissions.length === 0 ? (
+          <div className="p-12 text-center text-slate-500 font-medium glass-panel rounded-2xl border border-slate-100 italic">
+            No matching patient records found.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {admissions.map((record: Record<string, unknown>, index: number) => (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              <PatientCard key={((record.Id as number) || index)} patient={record as any} />
+            ))}
+          </div>
+        )}
+      </div>
+      
+      {/* Pagination Section */}
+      <div className="glass-panel border border-slate-100 rounded-2xl">
         <PaginationWrapper 
           currentPage={currentPage} 
           totalPages={totalPages} 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import { ResultSetHeader } from 'mysql2';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { getSession } from '@/lib/session';
 import { UserSchema } from '@/lib/schemas';
 
@@ -18,7 +18,11 @@ export async function PUT(
 
     const parsed = UserSchema.safeParse(rawData);
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Validation Error', details: parsed.error.format() }, { status: 400 });
+      console.error('User update validation failed:', parsed.error.format());
+      return NextResponse.json({ 
+        error: 'Validation Error', 
+        details: parsed.error.format() 
+      }, { status: 400 });
     }
     const data = parsed.data;
 
