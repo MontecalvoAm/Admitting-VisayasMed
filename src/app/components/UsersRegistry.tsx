@@ -167,7 +167,22 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
         showSuccess('User Created', `User account for ${formData.FirstName} ${formData.LastName} has been successfully created.`);
       } else {
         const err = await res.json();
-        showError('Registration Failed', err.error || 'Failed to add user account.');
+        let errorMessage = err.error || 'Failed to add user account.';
+        
+        // Detailed validation errors
+        if (err.details && typeof err.details === 'object') {
+          const detailMsgs = Object.entries(err.details)
+            .filter(([key]) => key !== '_errors')
+            .map(([field, info]: [string, any]) => {
+              const fieldErrors = info._errors || [];
+              return `${field}: ${fieldErrors.join(', ')}`;
+            });
+          if (detailMsgs.length > 0) {
+            errorMessage += '\n' + detailMsgs.join('\n');
+          }
+        }
+        
+        showError('Registration Failed', errorMessage);
       }
     } catch (error) {
       showError('System Error', 'An unexpected error occurred while adding the user.');
@@ -193,7 +208,22 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
         showSuccess('User Updated', `Account information for ${formData.FirstName} ${formData.LastName} has been updated.`);
       } else {
         const err = await res.json();
-        showError('Update Failed', err.error || 'Failed to update user account.');
+        let errorMessage = err.error || 'Failed to update user account.';
+        
+        // Detailed validation errors
+        if (err.details && typeof err.details === 'object') {
+          const detailMsgs = Object.entries(err.details)
+            .filter(([key]) => key !== '_errors')
+            .map(([field, info]: [string, any]) => {
+              const fieldErrors = info._errors || [];
+              return `${field}: ${fieldErrors.join(', ')}`;
+            });
+          if (detailMsgs.length > 0) {
+            errorMessage += '\n' + detailMsgs.join('\n');
+          }
+        }
+        
+        showError('Update Failed', errorMessage);
       }
     } catch (error) {
       showError('System Error', 'An unexpected error occurred while updating the user.');

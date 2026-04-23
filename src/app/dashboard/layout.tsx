@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session';
 import { redirect } from 'next/navigation';
 import { LogOut, Bell } from 'lucide-react';
 import HeaderTitle from '@/app/components/HeaderTitle';
+import HeaderMobileToggle from '@/app/components/HeaderMobileToggle';
 
 export default async function DashboardLayout({
   children,
@@ -17,7 +18,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-[var(--bg-page)] text-slate-900 font-sans relative">
+    <div className="min-h-screen bg-[var(--bg-page)] text-slate-900 font-sans relative overflow-x-hidden">
       {/* Global Watermark */}
       <div className="fixed inset-0 pointer-events-none z-0 flex items-center justify-center opacity-[0.08] select-none overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -40,14 +41,12 @@ export default async function DashboardLayout({
         
         {/* Top Navigation Bar */}
         <header className="sticky top-0 z-30 h-[var(--header-height)] min-h-[64px] glass-panel border-b border-[var(--glass-border)] px-4 md:px-8 flex items-center justify-between backdrop-blur-xl bg-white/80">
-          <div className="flex items-center gap-6 h-full">
+          <div className="flex items-center gap-4 md:gap-6 h-full">
+            <HeaderMobileToggle />
+            
             {/* Brand visible only when sidebar is collapsed */}
             <div className="header-brand flex items-center gap-2 mr-4 animate-in fade-in slide-in-from-left-4 duration-500">
-              <div className="w-8 h-8 flex items-center justify-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/Visayas%20Medical.png" alt="Logo" className="w-full h-full object-contain" />
-              </div>
-              <span className="text-sm font-black text-slate-800 tracking-tight uppercase">Visayasmed Hospital</span>
+              <span className="text-sm font-black text-vmed-blue-dark tracking-tight uppercase">Visayasmed Hospital</span>
             </div>
 
             {/* Current Page Title */}

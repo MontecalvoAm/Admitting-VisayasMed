@@ -50,7 +50,7 @@ const PatientForm: React.FC<PatientFormProps> = ({ formData, onChange, isReadOnl
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       {/* Patient Information */}
       <section>
         {sectionHeader("Patient Information", User)}

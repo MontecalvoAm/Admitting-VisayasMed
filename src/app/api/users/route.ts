@@ -15,11 +15,15 @@ export async function POST(req: NextRequest) {
     const rawData = await req.json();
     const parsed = UserSchema.safeParse(rawData);
     if (!parsed.success) {
-      return NextResponse.json({ error: 'Validation Error', details: parsed.error.format() }, { status: 400 });
+      console.error('User validation failed:', parsed.error.format());
+      return NextResponse.json({ 
+        error: 'Validation Error', 
+        details: parsed.error.format() 
+      }, { status: 400 });
     }
     const data = parsed.data;
     
-    if (!data.Password) {
+    if (!data.Password || data.Password.trim() === '') {
       return NextResponse.json({ error: 'Password is required for new users.' }, { status: 400 });
     }
 

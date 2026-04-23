@@ -237,6 +237,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
           setIsPrintPreviewOpen(true);
           markAsViewed();
         }}
+        suppressHydrationWarning
         className="p-2 text-slate-400 hover:text-vmed-blue-dark hover:bg-blue-50 rounded-lg transition-all"
         title="Print Preview"
       >
@@ -248,6 +249,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
           setIsViewOpen(true);
           markAsViewed();
         }}
+        suppressHydrationWarning
         className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
         title="View Details"
       >
@@ -261,6 +263,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
             setIsEditOpen(true);
             markAsViewed();
           }}
+          suppressHydrationWarning
           className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
           title="Edit Record"
         >
@@ -271,6 +274,7 @@ const PatientActions: React.FC<PatientActionsProps> = ({ patient, isAdmission = 
       {!isLoadingPerms && permissions?.CanDelete && (
         <button 
           onClick={handleDelete}
+          suppressHydrationWarning
           className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
           title="Delete Record"
         >
