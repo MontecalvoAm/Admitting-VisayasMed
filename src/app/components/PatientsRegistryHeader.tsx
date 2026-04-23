@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Download, Plus, Calendar, Loader2, X, ShieldAlert, RefreshCcw, Filter } from 'lucide-react';
+import { Search, Plus, Calendar, Loader2, X, ShieldAlert, RefreshCcw, Filter } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Modal from './Modal';
 import PatientForm from './PatientForm';

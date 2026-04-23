@@ -39,6 +39,10 @@ interface Role {
   RoleName: string;
 }
 
+interface ValidationErrorDetail {
+  _errors: string[];
+}
+
 const UsersRegistry: React.FC<UsersRegistryProps> = ({ 
   users, 
   totalItems, 
@@ -173,7 +177,7 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
         if (err.details && typeof err.details === 'object') {
           const detailMsgs = Object.entries(err.details)
             .filter(([key]) => key !== '_errors')
-            .map(([field, info]: [string, any]) => {
+            .map(([field, info]: [string, ValidationErrorDetail]) => {
               const fieldErrors = info._errors || [];
               return `${field}: ${fieldErrors.join(', ')}`;
             });
@@ -214,7 +218,7 @@ const UsersRegistry: React.FC<UsersRegistryProps> = ({
         if (err.details && typeof err.details === 'object') {
           const detailMsgs = Object.entries(err.details)
             .filter(([key]) => key !== '_errors')
-            .map(([field, info]: [string, any]) => {
+            .map(([field, info]: [string, ValidationErrorDetail]) => {
               const fieldErrors = info._errors || [];
               return `${field}: ${fieldErrors.join(', ')}`;
             });
