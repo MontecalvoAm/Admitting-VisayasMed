@@ -1,30 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
-import { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/session';
+import { hasPermission } from '@/lib/rbac';
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const { searchParams } = new URL(req.url);
     const limit = parseInt(searchParams.get('limit') || '5');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const [rows] = await pool.query<RowDataPacket[]>(
-      `SELECT r.*, (SELECT COUNT(*) FROM M_Users u WHERE u.RoleID = r.RoleID AND u.IsDeleted = false) as UserCount 
-       FROM M_Roles r 
-       WHERE r.IsDeleted = false 
-       ORDER BY r.RoleName
-       LIMIT ? OFFSET ?`,
-      [limit, offset]
-    );
+    const roles = await prisma.m_Roles.findMany({
+      where: { IsDeleted: false },
+      include: {
+        _count: {
+          select: { Users: { where: { IsDeleted: false } } }
+        }
+      },
+      orderBy: { RoleName: 'asc' },
+      take: limit,
+      skip: offset,
+    });
 
-    const [countRows] = await pool.query<RowDataPacket[]>(
-      'SELECT COUNT(*) as total FROM M_Roles WHERE IsDeleted = false'
-    );
+    const total = await prisma.m_Roles.count({
+      where: { IsDeleted: false }
+    });
 
     return NextResponse.json({
-      roles: rows,
-      total: countRows[0].total
+      roles: roles.map(r => ({
+        ...r,
+        UserCount: r._count.Users
+      })),
+      total
     });
   } catch (error) {
     console.error('Error fetching roles:', error);
@@ -34,20 +43,31 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const data = await req.json();
     const session = await getSession();
-    const createdBy = session ? `${session.firstName} ${session.lastName}` : 'System';
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // FIX: Check for 'Add' permission on 'Roles' module
+    const canAdd = await hasPermission(session.userId, session.roleId, 'Roles', 'Add');
+    if (!canAdd) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient Permissions' }, { status: 403 });
+    }
+
+    const data = await req.json();
+    const createdBy = `${session.firstName} ${session.lastName}`;
 
     if (!data.RoleName) {
       return NextResponse.json({ error: 'Role name is required.' }, { status: 400 });
     }
 
-    const [result] = await pool.execute<ResultSetHeader>(
-      'INSERT INTO M_Roles (RoleName, Description, CreatedBy) VALUES (?, ?, ?)',
-      [data.RoleName, data.Description || null, createdBy]
-    );
+    const newRole = await prisma.m_Roles.create({
+      data: {
+        RoleName: data.RoleName,
+        Description: data.Description || null,
+        CreatedBy: createdBy,
+      }
+    });
 
-    return NextResponse.json({ success: true, id: result.insertId }, { status: 201 });
+    return NextResponse.json({ success: true, id: newRole.RoleID }, { status: 201 });
   } catch (error) {
     console.error('Error creating role:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });

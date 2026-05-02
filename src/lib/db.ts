@@ -1,4 +1,27 @@
+import * as mariadb from 'mariadb';
+import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import mysql from 'mysql2/promise';
+import { PrismaClient } from '@prisma/client';
+
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+
+const prismaPool = mariadb.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'admitting_db',
+  connectionLimit: 10,
+});
+const adapter = new PrismaMariaDb(prismaPool);
+
+export const prisma =
+  globalForPrisma.prisma ||
+  new PrismaClient({
+    adapter,
+    log: ['query', 'info', 'warn', 'error'],
+  });
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 const writePool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -28,4 +51,5 @@ export const readPool = mysql.createPool({
 
 // For backward compatibility, the default pool acts as the write pool.
 // Refactor queries that only read data to use `readPool` directly.
+export { writePool };
 export default writePool;

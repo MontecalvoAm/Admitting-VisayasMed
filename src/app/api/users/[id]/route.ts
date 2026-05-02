@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import pool from '@/lib/db';
-import { ResultSetHeader } from 'mysql2';
+import { prisma } from '@/lib/db';
 import bcrypt from 'bcrypt';
 import { getSession } from '@/lib/session';
 import { UserSchema } from '@/lib/schemas';
+import { hasPermission } from '@/lib/rbac';
 
 export async function PUT(
   req: NextRequest,
@@ -13,12 +13,17 @@ export async function PUT(
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    // FIX: Check for 'Edit' permission on 'Users' module
+    const canEdit = await hasPermission(session.userId, session.roleId, 'Users', 'Edit');
+    if (!canEdit) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient Permissions' }, { status: 403 });
+    }
+
     const { id } = await params;
     const rawData = await req.json();
 
     const parsed = UserSchema.safeParse(rawData);
     if (!parsed.success) {
-      console.error('User update validation failed:', parsed.error.format());
       return NextResponse.json({ 
         error: 'Validation Error', 
         details: parsed.error.format() 
@@ -26,36 +31,28 @@ export async function PUT(
     }
     const data = parsed.data;
 
-    let query = `
-      UPDATE M_Users SET 
-        FirstName = ?, LastName = ?, Email = ?, RoleID = ?, 
-        UpdatedAt = CURRENT_TIMESTAMP
-    `;
-    const queryParams: (string | number)[] = [
-      data.FirstName,
-      data.LastName,
-      data.Email,
-      data.RoleID || 2
-    ];
+    const updateData: any = {
+      FirstName: data.FirstName,
+      LastName: data.LastName,
+      Email: data.Email,
+      RoleID: data.RoleID || 2,
+    };
 
     if (data.Password && data.Password.length > 0) {
-      query += `, Password = ?`;
-      const hashedPassword = await bcrypt.hash(data.Password, 12);
-      queryParams.push(hashedPassword);
+      updateData.Password = await bcrypt.hash(data.Password, 12);
     }
 
-    query += ` WHERE UserID = ?`;
-    queryParams.push(id);
+    const updatedUser = await prisma.m_Users.update({
+      where: { UserID: Number(id) },
+      data: updateData,
+    });
 
-    const [result] = await pool.execute<ResultSetHeader>(query, queryParams);
-
-    if (result.affectedRows === 0) {
+    return NextResponse.json({ success: true, user: updatedUser });
+  } catch (error: any) {
+    console.error('Error updating user:', error);
+    if (error.code === 'P2025') {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error updating user:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
@@ -68,21 +65,30 @@ export async function DELETE(
     const session = await getSession();
     if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { id } = await params;
-    
-    // Soft delete
-    const [result] = await pool.execute<ResultSetHeader>(
-      'UPDATE M_Users SET IsDeleted = true, DeletedAt = CURRENT_TIMESTAMP, DeletedBy = ? WHERE UserID = ?',
-      [`${session.firstName} ${session.lastName}`, id]
-    );
-
-    if (result.affectedRows === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // FIX: Check for 'Delete' permission on 'Users' module
+    const canDelete = await hasPermission(session.userId, session.roleId, 'Users', 'Delete');
+    if (!canDelete) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient Permissions' }, { status: 403 });
     }
 
+    const { id } = await params;
+    
+    // Soft delete using Prisma
+    await prisma.m_Users.update({
+      where: { UserID: Number(id) },
+      data: {
+        IsDeleted: true,
+        DeletedAt: new Date(),
+        DeletedBy: `${session.firstName} ${session.lastName}`,
+      },
+    });
+
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting user:', error);
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

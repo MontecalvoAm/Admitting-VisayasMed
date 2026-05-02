@@ -1,0 +1,336 @@
+generator client {
+  provider = "prisma-client-js"
+  engineType = "binary"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model form_schemas {
+  id          Int      @id @default(autoincrement())
+  schema_name String   @unique(map: "schema_name") @db.VarChar(100)
+  steps       String   @db.LongText
+  fields      String   @db.LongText
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+  updated_at  DateTime @default(now()) @db.Timestamp(0)
+}
+
+model m_admissions {
+  AdmissionID                Int        @id @default(autoincrement())
+  PatientID                  Int
+  Age                        Int?
+  AttendingPhysician         String?    @db.VarChar(150)
+  PreviouslyAdmitted         Boolean?   @default(false)
+  PreviousAdmissionDate      DateTime?  @db.Date
+  PhilHealthStatus           String?    @db.VarChar(100)
+  HmoCompany                 String?    @db.VarChar(100)
+  VmcBenefit                 String?    @db.VarChar(100)
+  ServiceCaseType            String?    @db.VarChar(100)
+  ControlNumber              String?    @db.VarChar(50)
+  PrintedNameSignature       String?    @db.VarChar(150)
+  RelationToPatientSignature String?    @db.VarChar(100)
+  NameSignature2             String?    @db.VarChar(150)
+  AdmittedAt                 DateTime?  @default(now()) @db.DateTime(0)
+  CreatedBy                  String?    @default("System") @db.VarChar(100)
+  CreatedAt                  DateTime?  @default(now()) @db.DateTime(0)
+  UpdatedBy                  String?    @db.VarChar(100)
+  UpdatedAt                  DateTime?  @db.DateTime(0)
+  IsDeleted                  Boolean?   @default(false)
+  IsViewed                   Boolean?   @default(false)
+  DeletedBy                  String?    @db.VarChar(100)
+  DeletedAt                  DateTime?  @db.DateTime(0)
+  m_patients                 m_patients @relation(fields: [PatientID], references: [PatientID], onUpdate: Restrict, map: "FK_Admission_Patient")
+
+  @@index([PatientID, AdmittedAt], map: "idx_admission_composite")
+  @@index([AdmittedAt], map: "idx_admission_date")
+  @@index([AdmittedAt, ServiceCaseType], map: "idx_admission_filters")
+  @@index([PatientID], map: "idx_admission_patient")
+  @@index([PatientID, AdmittedAt, IsDeleted], map: "idx_admissions_admitted_at")
+  @@index([ServiceCaseType], map: "idx_admissions_casetype")
+  @@index([PatientID, IsDeleted], map: "idx_admissions_patientid")
+}
+
+model m_auditlogs {
+  LogID      Int       @id @default(autoincrement())
+  UserID     Int?
+  UserName   String?   @db.VarChar(150)
+  Action     String    @db.VarChar(100)
+  Resource   String?   @db.VarChar(100)
+  ResourceID String?   @db.VarChar(100)
+  Details    String?   @db.Text
+  IPAddress  String?   @db.VarChar(45)
+  UserAgent  String?   @db.Text
+  CreatedAt  DateTime? @default(now()) @db.DateTime(0)
+  m_users    m_users?  @relation(fields: [UserID], references: [UserID], onUpdate: Restrict, map: "m_auditlogs_ibfk_1")
+
+  @@index([Action], map: "idx_audit_action")
+  @@index([CreatedAt], map: "idx_audit_created_at")
+  @@index([Resource], map: "idx_audit_resource")
+  @@index([UserID], map: "idx_audit_user_id")
+}
+
+model m_formfields {
+  id          String      @id @db.VarChar(50)
+  form_id     Int
+  step_id     String      @db.VarChar(50)
+  label       String      @db.VarChar(255)
+  name        String      @db.VarChar(255)
+  type        String      @db.VarChar(100)
+  is_required Boolean?    @default(false)
+  placeholder String?     @db.VarChar(255)
+  options     String?     @db.LongText
+  order_index Int         @default(0)
+  m_forms     m_forms     @relation(fields: [form_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "m_formfields_ibfk_1")
+  m_formsteps m_formsteps @relation(fields: [step_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "m_formfields_ibfk_2")
+
+  @@index([form_id], map: "form_id")
+  @@index([step_id], map: "step_id")
+}
+
+model m_forms {
+  id           Int            @id @default(autoincrement())
+  schema_name  String         @unique(map: "schema_name") @db.VarChar(255)
+  created_at   DateTime       @default(now()) @db.Timestamp(0)
+  updated_at   DateTime       @default(now()) @db.Timestamp(0)
+  m_formfields m_formfields[]
+  m_formsteps  m_formsteps[]
+}
+
+model m_formsteps {
+  id           String         @id @db.VarChar(50)
+  form_id      Int
+  label        String         @db.VarChar(255)
+  order_index  Int            @default(0)
+  m_formfields m_formfields[]
+  m_forms      m_forms        @relation(fields: [form_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "m_formsteps_ibfk_1")
+
+  @@index([form_id], map: "form_id")
+}
+
+model m_modules {
+  ModuleID          Int                 @id @default(autoincrement())
+  ModuleName        String              @unique(map: "ModuleName") @db.VarChar(100)
+  ModulePath        String              @db.VarChar(255)
+  Icon              String?             @db.VarChar(50)
+  SortOrder         Int?                @default(0)
+  CreatedBy         String?             @default("System") @db.VarChar(100)
+  CreatedAt         DateTime?           @default(now()) @db.DateTime(0)
+  UpdatedBy         String?             @db.VarChar(100)
+  UpdatedAt         DateTime?           @db.DateTime(0)
+  IsDeleted         Boolean?            @default(false)
+  DeletedBy         String?             @db.VarChar(100)
+  DeletedAt         DateTime?           @db.DateTime(0)
+  m_rolepermissions m_rolepermissions[]
+  m_userpermissions m_userpermissions[]
+}
+
+model m_patients {
+  PatientID              Int            @id @default(autoincrement())
+  LastName               String         @db.VarChar(100)
+  GivenName              String         @db.VarChar(100)
+  MiddleName             String?        @db.VarChar(100)
+  Suffix                 String?        @db.VarChar(20)
+  Birthday               DateTime?      @db.Date
+  BirthPlace             String?        @db.VarChar(255)
+  Sex                    String?        @db.VarChar(20)
+  ContactNumber          String?        @db.VarChar(50)
+  CityAddress            String?        @db.Text
+  ProvincialAddress      String?        @db.Text
+  CivilStatus            String?        @db.VarChar(50)
+  Religion               String?        @db.VarChar(100)
+  Citizenship            String?        @db.VarChar(100)
+  Occupation             String?        @db.VarChar(100)
+  FatherFamilyName       String?        @db.VarChar(100)
+  FatherGivenName        String?        @db.VarChar(100)
+  FatherMiddleName       String?        @db.VarChar(100)
+  FatherContact          String?        @db.VarChar(50)
+  MotherFamilyName       String?        @db.VarChar(100)
+  MotherGivenName        String?        @db.VarChar(100)
+  MotherMiddleName       String?        @db.VarChar(100)
+  MotherContact          String?        @db.VarChar(50)
+  SpouseFamilyName       String?        @db.VarChar(100)
+  SpouseGivenName        String?        @db.VarChar(100)
+  SpouseMiddleName       String?        @db.VarChar(100)
+  SpouseContact          String?        @db.VarChar(50)
+  EmergencyContactName   String?        @db.VarChar(150)
+  EmergencyRelation      String?        @db.VarChar(100)
+  EmergencyContactNumber String?        @db.VarChar(50)
+  ResponsibleName        String?        @db.VarChar(150)
+  ResponsibleContact     String?        @db.VarChar(50)
+  ResponsibleAddress     String?        @db.Text
+  ResponsibleRelation    String?        @db.VarChar(100)
+  CreatedBy              String?        @default("System") @db.VarChar(100)
+  CreatedAt              DateTime?      @default(now()) @db.DateTime(0)
+  UpdatedBy              String?        @db.VarChar(100)
+  UpdatedAt              DateTime?      @db.DateTime(0)
+  IsDeleted              Boolean?       @default(false)
+  DeletedBy              String?        @db.VarChar(100)
+  DeletedAt              DateTime?      @db.DateTime(0)
+  m_admissions           m_admissions[]
+
+  @@index([LastName, GivenName], map: "idx_patient_lookup")
+  @@index([LastName, GivenName], map: "idx_patient_name")
+  @@index([IsDeleted], map: "idx_patients_isdeleted")
+  @@index([LastName, GivenName], map: "idx_patients_name")
+}
+
+model m_patients_old {
+  Id                         Int                              @id @default(autoincrement())
+  LastName                   String?                          @db.VarChar(255)
+  GivenName                  String?                          @db.VarChar(255)
+  MiddleName                 String?                          @db.VarChar(255)
+  Suffix                     String?                          @db.VarChar(255)
+  Age                        Int?
+  Birthday                   DateTime?                        @db.Date
+  BirthPlace                 String?                          @db.VarChar(255)
+  Sex                        m_patients_old_Sex?
+  ContactNumber              String?                          @db.VarChar(255)
+  CityAddress                String?                          @db.Text
+  ProvincialAddress          String?                          @db.Text
+  CivilStatus                String?                          @db.VarChar(255)
+  Religion                   String?                          @db.VarChar(255)
+  Citizenship                String?                          @db.VarChar(255)
+  Occupation                 String?                          @db.VarChar(255)
+  FatherFamilyName           String?                          @db.VarChar(255)
+  FatherGivenName            String?                          @db.VarChar(255)
+  FatherMiddleName           String?                          @db.VarChar(255)
+  FatherContact              String?                          @db.VarChar(255)
+  MotherFamilyName           String?                          @db.VarChar(255)
+  MotherGivenName            String?                          @db.VarChar(255)
+  MotherMiddleName           String?                          @db.VarChar(255)
+  MotherContact              String?                          @db.VarChar(255)
+  SpouseFamilyName           String?                          @db.VarChar(255)
+  SpouseGivenName            String?                          @db.VarChar(255)
+  SpouseMiddleName           String?                          @db.VarChar(255)
+  SpouseContact              String?                          @db.VarChar(255)
+  EmergencyContactName       String?                          @db.VarChar(255)
+  EmergencyRelation          String?                          @db.VarChar(255)
+  EmergencyContactNumber     String?                          @db.VarChar(255)
+  ResponsibleName            String?                          @db.VarChar(255)
+  ResponsibleContact         String?                          @db.VarChar(255)
+  ResponsibleAddress         String?                          @db.Text
+  ResponsibleRelation        String?                          @db.VarChar(255)
+  AttendingPhysician         String?                          @db.VarChar(255)
+  PreviouslyAdmitted         Boolean?
+  PreviousAdmissionDate      DateTime?                        @db.Date
+  PhilHealthStatus           m_patients_old_PhilHealthStatus?
+  HmoCompany                 Boolean?
+  VmcBenefit                 m_patients_old_VmcBenefit?
+  ServiceCaseType            m_patients_old_ServiceCaseType?
+  PrintedNameSignature       String?                          @db.VarChar(255)
+  RelationToPatientSignature String?                          @db.VarChar(255)
+  NameSignature2             String?                          @db.VarChar(255)
+  CreatedBy                  String?                          @db.VarChar(255)
+  CreatedAt                  DateTime?                        @db.DateTime(0)
+  UpdatedBy                  String?                          @db.VarChar(255)
+  UpdatedAt                  DateTime?                        @db.DateTime(0)
+  IsDeleted                  Boolean?                         @default(false)
+  DeletedAt                  DateTime?                        @db.DateTime(0)
+  DeletedBy                  String?                          @db.VarChar(255)
+}
+
+model m_rolepermissions {
+  RolePermissionID Int       @id @default(autoincrement())
+  RoleID           Int
+  ModuleID         Int
+  CanView          Boolean?  @default(false)
+  CanAdd           Boolean?  @default(false)
+  CanEdit          Boolean?  @default(false)
+  CanDelete        Boolean?  @default(false)
+  CreatedBy        String?   @default("System") @db.VarChar(100)
+  CreatedAt        DateTime? @default(now()) @db.DateTime(0)
+  UpdatedBy        String?   @db.VarChar(100)
+  UpdatedAt        DateTime? @db.DateTime(0)
+  IsDeleted        Boolean?  @default(false)
+  DeletedBy        String?   @db.VarChar(100)
+  DeletedAt        DateTime? @db.DateTime(0)
+  m_modules        m_modules @relation(fields: [ModuleID], references: [ModuleID], onUpdate: Restrict, map: "FK_RolePerm_Module")
+  m_roles          m_roles   @relation(fields: [RoleID], references: [RoleID], onUpdate: Restrict, map: "FK_RolePerm_Role")
+
+  @@index([ModuleID], map: "FK_RolePerm_Module")
+  @@index([RoleID], map: "FK_RolePerm_Role")
+}
+
+model m_roles {
+  RoleID            Int                 @id @default(autoincrement())
+  RoleName          String              @unique(map: "RoleName") @db.VarChar(50)
+  Description       String?             @db.Text
+  CreatedBy         String?             @db.VarChar(100)
+  CreatedAt         DateTime?           @default(now()) @db.DateTime(0)
+  UpdatedBy         String?             @db.VarChar(100)
+  UpdatedAt         DateTime?           @db.DateTime(0)
+  IsDeleted         Boolean?            @default(false)
+  DeletedAt         DateTime?           @db.DateTime(0)
+  DeletedBy         String?             @db.VarChar(100)
+  m_rolepermissions m_rolepermissions[]
+  m_users           m_users[]
+}
+
+model m_userpermissions {
+  UserPermissionID Int       @id @default(autoincrement())
+  UserID           Int
+  ModuleID         Int
+  CanView          Boolean?  @default(false)
+  CanAdd           Boolean?  @default(false)
+  CanEdit          Boolean?  @default(false)
+  CanDelete        Boolean?  @default(false)
+  CreatedBy        String?   @default("System") @db.VarChar(100)
+  CreatedAt        DateTime? @default(now()) @db.DateTime(0)
+  UpdatedBy        String?   @db.VarChar(100)
+  UpdatedAt        DateTime? @db.DateTime(0)
+  IsDeleted        Boolean?  @default(false)
+  DeletedBy        String?   @db.VarChar(100)
+  DeletedAt        DateTime? @db.DateTime(0)
+  m_modules        m_modules @relation(fields: [ModuleID], references: [ModuleID], onUpdate: Restrict, map: "FK_UserPerm_Module")
+  m_users          m_users   @relation(fields: [UserID], references: [UserID], onUpdate: Restrict, map: "FK_UserPerm_User")
+
+  @@index([ModuleID], map: "FK_UserPerm_Module")
+  @@index([UserID], map: "FK_UserPerm_User")
+}
+
+model m_users {
+  UserID            Int                 @id @default(autoincrement())
+  FirstName         String              @db.VarChar(100)
+  LastName          String              @db.VarChar(100)
+  Email             String              @unique(map: "Email") @db.VarChar(150)
+  Password          String              @db.VarChar(255)
+  RoleID            Int?
+  CreatedBy         String?             @db.VarChar(100)
+  CreatedAt         DateTime?           @default(now()) @db.DateTime(0)
+  UpdatedBy         String?             @db.VarChar(100)
+  UpdatedAt         DateTime?           @db.DateTime(0)
+  IsDeleted         Boolean?            @default(false)
+  DeletedAt         DateTime?           @db.DateTime(0)
+  DeletedBy         String?             @db.VarChar(100)
+  m_auditlogs       m_auditlogs[]
+  m_userpermissions m_userpermissions[]
+  m_roles           m_roles?            @relation(fields: [RoleID], references: [RoleID], onUpdate: Restrict, map: "m_users_ibfk_1")
+
+  @@index([RoleID], map: "RoleID")
+}
+
+enum m_patients_old_Sex {
+  Male
+  Female
+}
+
+enum m_patients_old_PhilHealthStatus {
+  Member
+  Dependent
+  Mandatory
+  None
+}
+
+enum m_patients_old_VmcBenefit {
+  Employee
+  Dependent
+  None
+}
+
+enum m_patients_old_ServiceCaseType {
+  Private
+  House_Case   @map("House Case")
+  Charity
+  Project_Case @map("Project Case")
+}
